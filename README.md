@@ -28,4 +28,4 @@ and TAB completion are your friends.
 
 ## Copyright
 
-vrc is distributed under the GNU General Public License, version 2 or later.
+vrc is distributed under the GNU General Public License, version 3 or later.
