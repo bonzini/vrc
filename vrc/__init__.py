@@ -295,6 +295,7 @@ class CompdbCommand(VRCCommand):
                 key = os.path.abspath(os.path.join(entry["directory"], entry["output"]))
                 COMPDB[key] = entry["command"]
 
+
 COMPDB: dict[str, str] = dict()
 
 
@@ -351,7 +352,7 @@ class LoadCommand(VRCCommand):
                             try:
                                 result = subprocess.run(cmdline,
                                                         stdin=subprocess.DEVNULL)
-                            except KeyboardInterrupt as e:
+                            except KeyboardInterrupt:
                                 print("Interrupt", file=sys.stderr)
                                 break
                             if result.returncode != 0:
@@ -359,7 +360,7 @@ class LoadCommand(VRCCommand):
                                 continue
                             dumps = glob.glob(fn + ".*r.expand")
                             if not dumps:
-                                print(f"Compiler did not produce dump file", file=sys.stderr)
+                                print("Compiler did not produce dump file", file=sys.stderr)
                                 continue
 
                         if len(dumps) > 1:
@@ -694,6 +695,7 @@ class SourceCommand(VRCCommand):
                 if exit_first:
                     break
 
+
 class ReadlineInput:
     def __init__(self, prompt: str):
         self.prompt = prompt
@@ -724,7 +726,7 @@ class ReadlineInput:
         words = line.strip().split()
         nwords = len(words) - (0 if not line or line[-1] in " \t" else 1)
 
-	    # Expand the text that is used for completion
+        # Expand the text that is used for completion
         replacement = self.get_forced_replacement(words, nwords, text)
         if replacement:
             text = replacement
@@ -732,8 +734,8 @@ class ReadlineInput:
         completions = self.get_completions(words, nwords, text)
         completions = [x for x in completions if x.startswith(text)]
         if len(completions) == 1 \
-            and (text != "" or not completions[0].startswith("-")) \
-            and not completions[0].endswith("/"):
+                and (text != "" or not completions[0].startswith("-")) \
+                and not completions[0].endswith("/"):
             return [completions[0] + " "]
         if len(completions) > 1 and replacement:
             return [replacement]
