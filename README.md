@@ -19,6 +19,13 @@ callgraph".
 
 `pip install --user .` will install an executable called `vrc`.
 
+## Usage
+
+Run it in a directory that has a `compile_commands.json` file.
+
+Documentation coming soon.  For now, the `help` command
+and TAB completion are your friends.
+
 ## Copyright
 
 vrc is distributed under the GNU General Public License, version 2 or later.
