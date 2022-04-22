@@ -52,7 +52,7 @@ class Graph:
     nodes_by_username: dict[str, Node]
     nodes_by_file: dict[str, list[str]]
     keep: typing.Optional[set[str]]
-    omit: set[str]
+    omitted: set[str]
     filter_default: bool
 
     def __init__(self):
@@ -181,7 +181,7 @@ class Graph:
             return False
         if self.keep is not None and n.name in self.keep:
             return True
-        if n.name in self.omit:
+        if n.name in self.omitted:
             return False
         return self.filter_default
 
@@ -202,7 +202,7 @@ class Graph:
         n = self._get_node(name)
         name = n.name if n else name
 
-        self.omit.add(name)
+        self.omitted.add(name)
         if self.keep is not None and name in self.keep:
             self.keep.remove(name)
 
@@ -214,11 +214,11 @@ class Graph:
         name = n.name if n else name
 
         self.keep.add(name)
-        if name in self.omit:
-            self.omit.remove(name)
+        if name in self.omitted:
+            self.omitted.remove(name)
 
     def reset_filter(self) -> None:
-        self.omit = set()
+        self.omitted = set()
         self.keep = None
         self.filter_default = True
 
