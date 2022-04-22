@@ -34,12 +34,12 @@ jobs:
         flake8 . --show-source
     - name: Lint with mypy
       run: |
-        mypy -p vrc
+        mypy -p vrc -p tests
+    - name: Test with pytest
+      run: |
+        pytest
     - name: Install in a virtual environment
       run: |
         python -m venv venv
         . venv/bin/activate && pip install .
-#   - name: Test with pytest
-#     run: |
-#       pytest
 
