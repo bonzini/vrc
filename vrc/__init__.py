@@ -53,6 +53,8 @@ class Graph:
     nodes_by_file: dict[str, list[str]]
     keep: typing.Optional[set[str]]
     omitted: set[str]
+    omitting_callers: set[str]    # Edges directed to these nodes are ignored
+    omitting_callees: set[str]    # Edges starting from these nodes are ignored
     filter_default: bool
 
     def __init__(self):
@@ -196,6 +198,10 @@ class Graph:
         callee_node = self._get_node(callee)
         if not caller_node or not callee_node:
             return False
+        if caller_node.name in self.omitting_callees:
+            return False
+        if callee_node.name in self.omitting_callers:
+            return False
         return caller_node[callee_node.name] == "call" or (ref_ok and not callee_node.external)
 
     def omit_node(self, name: str) -> None:
@@ -205,6 +211,37 @@ class Graph:
         self.omitted.add(name)
         if self.keep is not None and name in self.keep:
             self.keep.remove(name)
+
+    def _check_node_visibility(self, name: str) -> None:
+        callers = self.callers(name, True)
+        if next(callers, None) is not None:
+            return
+
+        callees = self.callees(name, True, True)
+        if next(callees, None) is not None:
+            return
+
+        self.omit_node(name)
+
+    def omit_callers(self, name: str) -> None:
+        n = self._get_node(name)
+        name = n.name if n else name
+
+        self.omitting_callers.add(name)
+        self._check_node_visibility(name)
+        if n:
+            for caller in n.callers:
+                self._check_node_visibility(caller)
+
+    def omit_callees(self, name: str) -> None:
+        n = self._get_node(name)
+        name = n.name if n else name
+
+        self.omitting_callees.add(name)
+        self._check_node_visibility(name)
+        if n:
+            for callee in n.callees:
+                self._check_node_visibility(callee)
 
     def keep_node(self, name: str) -> None:
         if self.keep is None:
@@ -219,6 +256,8 @@ class Graph:
 
     def reset_filter(self) -> None:
         self.omitted = set()
+        self.omitting_callers = set()
+        self.omitting_callees = set()
         self.keep = None
         self.filter_default = True
 
@@ -439,13 +478,15 @@ class OmitCommand(VRCCommand):
 
     def run(self, args: argparse.Namespace):
         for f in args.funcs:
-            GRAPH.omit_node(f)
+            if not args.callers and not args.callees:
+                GRAPH.omit_node(f)
+                continue
             if args.callers:
                 for caller in GRAPH.all_callers(f):
-                    GRAPH.omit_node(caller)
+                    GRAPH.omit_callers(caller)
             if args.callees:
                 for callee in GRAPH.all_callees(f):
-                    GRAPH.omit_node(callee)
+                    GRAPH.omit_callees(callee)
 
 
 class KeepCommand(VRCCommand):
