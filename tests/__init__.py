@@ -37,3 +37,27 @@ class VRCGraphTest(unittest.TestCase):
         graph.add_node("a")
         self.assertTrue(graph.has_node("a"))
         self.assertTrue(graph.filter_node("a", False))
+
+    def test_callers_of_omitted_node(self):
+        """Check edges."""
+        graph = vrc.Graph()
+        graph.add_node("a")
+        graph.add_node("b")
+        graph.add_node("c")
+        graph.add_edge("a", "b", "call")
+        graph.add_edge("b", "c", "call")
+        graph.omit_node("b")
+        graph.omit_node("c")
+        self.assertTrue(graph.filter_edge("a", "b", False))
+
+    def test_callees_of_omitted_node(self):
+        """Check creating an edge before a function is defined."""
+        graph = vrc.Graph()
+        graph.add_node("a")
+        graph.add_node("b")
+        graph.add_node("c")
+        graph.add_edge("a", "b", "call")
+        graph.add_edge("b", "c", "call")
+        graph.omit_node("a")
+        graph.omit_node("b")
+        self.assertTrue(graph.filter_edge("b", "c", False))
