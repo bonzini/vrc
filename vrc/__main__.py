@@ -13,6 +13,7 @@ import argparse
 from . import graph
 from collections import defaultdict
 import glob
+import itertools
 import io
 import json
 import os
@@ -47,6 +48,47 @@ class MyArgumentParser(argparse.ArgumentParser):
 PARSER = MyArgumentParser()
 
 
+class Completer:
+    def try_to_expand(self, text: str) -> str:
+        return text
+
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        return []
+
+
+class CommandCompleter(Completer):
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        return sorted(HelpCommand.PARSERS.keys())
+
+
+class FileCompleter(Completer):
+    def __init__(self, glob_patterns: list[str] = ['*']):
+        self.glob_patterns = glob_patterns
+
+    def try_to_expand(self, text: str) -> str:
+        expanded = text
+        if text.startswith('~'):
+            expanded = os.path.expanduser(expanded)
+        if not expanded.endswith("/") and os.path.isdir(expanded):
+            expanded += "/"
+        return expanded
+
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        result = glob.glob(text + "*/")
+        path = os.path.dirname(text)
+        if path:
+            path += "/"
+        for i in self.glob_patterns:
+            expanded = glob.glob(path + i)
+            result += (x for x in expanded if not os.path.isdir(x))
+        return result
+
+
+class NodeCompleter(Completer):
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        return set(GRAPH.nodes_by_username.keys()).union(GRAPH.nodes.keys())
+
+
 class VRCCommand:
 
     NAME: typing.Optional[tuple[str, ...]] = None
@@ -55,6 +97,10 @@ class VRCCommand:
     def args(self, parser: argparse.ArgumentParser):
         """Setup argument parser"""
         pass
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return Completer()
 
     def run(self, args: argparse.Namespace):
         pass
@@ -68,6 +114,11 @@ class ChdirCommand(VRCCommand):
     def args(self, parser: argparse.ArgumentParser):
         parser.add_argument("dir", metavar="DIR",
                             help="New current directory")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        # complete by directory only
+        return FileCompleter([])
 
     def run(self, args: argparse.Namespace):
         os.chdir(os.path.expanduser(args.dir))
@@ -100,6 +151,10 @@ class CompdbCommand(VRCCommand):
         parser.add_argument("file", metavar="FILE",
                             help="JSON file to be loaded")
 
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return FileCompleter(["*.json"])
+
     def run(self, args: argparse.Namespace):
         with open(args.file, 'r') as f:
             for entry in json.load(f):
@@ -127,6 +182,10 @@ class LoadCommand(VRCCommand):
                             help="Report progress while parsing")
         parser.add_argument("files", metavar="FILE", nargs="+",
                             help="Dump or object file to be loaded")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return FileCompleter(["*.o", "*r.expand"])
 
     def run(self, args: argparse.Namespace):
         def build_gcc_S_command_line(cmd, outfile):
@@ -218,6 +277,10 @@ class EdgeCommand(VRCCommand):
                             help="Type of the new edge (call or ref)",
                             choices=["call", "ref"], default="call")
 
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
+
     def run(self, args: argparse.Namespace):
         if not GRAPH.has_node(args.caller):
             raise argparse.ArgumentError(None, "caller not found in graph")
@@ -237,6 +300,10 @@ class OmitCommand(VRCCommand):
                             help="Omit all callees, recursively.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
 
     def run(self, args: argparse.Namespace):
         for f in args.funcs:
@@ -264,6 +331,10 @@ class KeepCommand(VRCCommand):
                             help="Keep all callees, recursively.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
 
     def run(self, args: argparse.Namespace):
         for f in args.funcs:
@@ -328,6 +399,10 @@ class CallersCommand(VRCCommand):
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
 
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
+
     def run(self, args: argparse.Namespace):
         result = defaultdict(lambda: list())
         for f in args.funcs:
@@ -350,6 +425,10 @@ class CalleesCommand(VRCCommand):
                             help="Include references to functions.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
 
     def run(self, args: argparse.Namespace):
         result = defaultdict(lambda: list())
@@ -376,6 +455,10 @@ class OutputCommand(VRCCommand):
         parser.add_argument("--include-ref", action="store_true",
                             help="Include references to functions.")
         parser.add_argument("file", metavar="FILE", nargs="?")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return FileCompleter()
 
     def run(self, args: argparse.Namespace):
         def emit(f):
@@ -475,6 +558,10 @@ class SourceCommand(VRCCommand):
     def args(self, parser: argparse.ArgumentParser):
         parser.add_argument("file", metavar="FILE")
 
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return FileCompleter()
+
     def run(self, args: argparse.Namespace):
         with open(args.file, "r") as f:
             self.do_source(f, exit_first=True)
@@ -511,6 +598,12 @@ class SourceCommand(VRCCommand):
 
 
 class ReadlineInput:
+    CMDCLASSES: dict[str, typing.Type[VRCCommand]] = {}
+
+    @classmethod
+    def register(self, command: str, cls: typing.Type[VRCCommand]):
+        self.CMDCLASSES[command] = cls
+
     def __init__(self, prompt: str):
         self.prompt = prompt
         readline.parse_and_bind("tab: complete")
@@ -540,67 +633,35 @@ class ReadlineInput:
         words = line.strip().split()
         nwords = len(words) - (0 if not line or line[-1] in " \t" else 1)
 
-        # Expand the text that is used for completion
-        replacement = self.get_forced_replacement(words, nwords, text)
-        if replacement:
-            text = replacement
+        completer = self.get_completer(words, nwords, text)
 
-        completions = self.get_completions(words, nwords, text)
-        completions = [x for x in completions if x.startswith(text)]
+        # Expand the text that is used for completion
+        expansion = completer.try_to_expand(text)
+        did_expand = (text != expansion)
+        text = expansion
+
+        opts = []
+        if words and text.startswith('--') or text == '' or text == '-':
+            # ugly...
+            opts = sorted(HelpCommand.PARSERS[words[0]]._option_string_actions.keys())
+
+        args = completer.get_completions(text)
+        completions = [x for x in itertools.chain(opts, args) if x.startswith(text)]
         if len(completions) == 1 \
                 and (text != "" or not completions[0].startswith("-")) \
                 and not completions[0].endswith("/"):
             return [completions[0] + " "]
-        if len(completions) > 1 and replacement:
-            return [replacement]
-        return completions
+        if len(completions) > 1 and did_expand:
+            return [text]
+        return sorted(completions)
 
-    def get_forced_replacement(self, words: list[str], nwords: int, text: str) -> typing.Optional[str]:
-        expanded = text
-        if words and words[0] in ['load', 'cd', 'compdb', 'output']:
-            if text.startswith('~'):
-                expanded = os.path.expanduser(expanded)
-            if not expanded.endswith("/") and os.path.isdir(expanded):
-                expanded += "/"
-        return expanded if expanded != text else None
-
-    def get_completions(self, words: list[str], nwords: int, text: str) -> list[str]:
+    def get_completer(self, words: list[str], nwords: int, text: str) -> Completer:
         if nwords == 0:
-            return sorted(HelpCommand.PARSERS.keys())
-
-        opts = []
-        if text.startswith('--') or text == '' or text == '-':
-            # ugly...
-            opts = sorted(HelpCommand.PARSERS[words[0]]._option_string_actions.keys())
-
-        args = []
-        if words[0] in ['callers', 'callees', 'keep', 'omit', 'edge']:
-            # complete by function name
-            args = sorted(set(GRAPH.nodes_by_username.keys()).union(GRAPH.nodes.keys()))
-        elif words[0] in ['pwd']:
-            pass
-        elif words[0] in ['cd']:
-            # complete by directory only
-            args = sorted(glob.glob(text + '*/'))
-        elif words[0] in ['load']:
-            # complete by RTL dump, object file or directory
-            path = os.path.dirname(text)
-            args = glob.glob(path + '/*r.expand')
-            args += glob.glob(path + '/*.o')
-            args += glob.glob(text + '*/')
-            args = sorted(args)
-        elif words[0] in ['compdb']:
-            # complete by json or directory
-            path = os.path.dirname(text)
-            args = glob.glob(path + '/*.json')
-            args += glob.glob(text + '*/')
-            args = sorted(args)
-        elif words[0] in ['output', 'source']:
-            # complete by any file name
-            args = sorted(glob.glob(text + '*'))
-            args = [x + "/" if os.path.isdir(x) else x for x in args]
-
-        return opts + args
+            return CommandCompleter()
+        elif words[0] not in self.CMDCLASSES:
+            return Completer()
+        else:
+            return self.CMDCLASSES[words[0]].get_completer(nwords)
 
     def display_matches(self, substitution: str, matches: typing.Sequence[str], longest_match_length: int):
         line_buffer = readline.get_line_buffer()
@@ -648,6 +709,7 @@ def init_subparsers():
         for n in cls.NAME:  # type: ignore
             subp = subparsers.add_parser(n, help=cls.__doc__)
             HelpCommand.register(n, subp)
+            ReadlineInput.register(n, cls)
             cls.args(subp)
             subp.set_defaults(cmd=n)
             subp.set_defaults(cmdclass=cls)
