@@ -156,7 +156,15 @@ class ReadlineInput:
     def get_matches(self, text: str):
         line = readline.get_line_buffer()
         words = line.strip().split()
-        nwords = len(words) - (0 if not line or line[-1] in " \t" else 1)
+        nwords = 0
+        for n, word in enumerate(words):
+            if n > 0 and word.startswith('-'):
+                # do not count options (FIXME: this assumes they're all booleans)
+                continue
+            if n == len(words) - 1 and line[-1] not in " \t":
+                # do not count the final word if it is incomplete
+                continue
+            nwords += 1
 
         completer = self.get_completer(words, nwords, text)
 

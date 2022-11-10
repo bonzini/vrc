@@ -58,6 +58,14 @@ class FileCompleter(Completer):
         return result
 
 
+class StringsCompleter(Completer):
+    def __init__(self, strings: list[str]):
+        self.strings = strings
+
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        return self.strings
+
+
 class LabelCompleter(Completer):
     def get_completions(self, text: str) -> typing.Iterable[str]:
         return GRAPH.labels()
@@ -97,7 +105,7 @@ class ChdirCommand(VRCCommand):
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
         # complete by directory only
-        return FileCompleter([])
+        return FileCompleter([]) if nwords == 1 else Completer()
 
     def run(self, args: argparse.Namespace):
         os.chdir(os.path.expanduser(args.dir))
@@ -132,7 +140,7 @@ class CompdbCommand(VRCCommand):
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
-        return FileCompleter(["*.json"])
+        return FileCompleter(["*.json"]) if nwords == 1 else Completer()
 
     def run(self, args: argparse.Namespace):
         with open(args.file, 'r') as f:
@@ -258,7 +266,11 @@ class EdgeCommand(VRCCommand):
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
-        return NodeCompleter()
+        if nwords < 3:
+            return NodeCompleter()
+        if nwords == 3:
+            return StringsCompleter(["call", "ref"])
+        return Completer()
 
     def run(self, args: argparse.Namespace):
         if not GRAPH.has_node(args.caller):
@@ -468,7 +480,7 @@ class OutputCommand(VRCCommand):
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
-        return FileCompleter()
+        return FileCompleter() if nwords == 1 else Completer()
 
     def run(self, args: argparse.Namespace):
         def emit(f):
