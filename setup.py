@@ -14,7 +14,7 @@ setup(
     packages=['vrc'],
     entry_points={
         'console_scripts': [
-            'vrc = vrc:main',
+            'vrc = vrc.__main__:main',
         ]
     }
 )

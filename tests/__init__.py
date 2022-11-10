@@ -1,11 +1,11 @@
 import unittest
-import vrc
+from vrc.graph import Graph
 
 
 class VRCGraphTest(unittest.TestCase):
     def test_edge_to_nonexisting_node(self):
         """Check creating an edge to a function that is not defined."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_edge("a", "b", "call")
         self.assertTrue(graph.has_node("b"))
@@ -15,7 +15,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_filter_edge_ref_ok(self):
         """Check ref_ok argument to filter_edge."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_edge("a", "b", "ref")
         graph.add_node("b")
@@ -24,7 +24,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_hide_external_ref(self):
         """References to external symbols are hidden even with ref_ok=True."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_edge("a", "b", "ref")
         self.assertTrue(graph.has_node("b"))
@@ -32,7 +32,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_convert_external_node(self):
         """Check creating an edge before a function is defined."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_external_node("a")
         self.assertTrue(graph.has_node("a"))
         graph.add_node("a")
@@ -41,7 +41,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callers_of_omitted_node(self):
         """Check edges."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -53,7 +53,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callees_of_omitted_node(self):
         """Check creating an edge before a function is defined."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -65,7 +65,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callers(self):
         """Check callers(), "call" edges only."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -77,7 +77,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callers_ref_ok(self):
         """Check callers(), "call" and "ref"."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -90,7 +90,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callees(self):
         """Check callees(), "call" edges to non-external nodes."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -102,7 +102,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callees_ref_ok(self):
         """Check callees(), "call" and "ref" edges."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -115,7 +115,7 @@ class VRCGraphTest(unittest.TestCase):
 
     def test_callees_external_ok(self):
         """Check callees() for external nodes."""
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -126,7 +126,7 @@ class VRCGraphTest(unittest.TestCase):
         self.assertEqual(sorted(graph.callees("b", False, False)), ["c"])
 
     def test_reset_filter(self):
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.omit_node("a")
         self.assertFalse(graph.filter_node("a", False))
@@ -134,7 +134,7 @@ class VRCGraphTest(unittest.TestCase):
         self.assertTrue(graph.filter_node("a", False))
 
     def test_omit_callees(self):
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -150,7 +150,7 @@ class VRCGraphTest(unittest.TestCase):
         self.assertFalse(graph.filter_node("d", False))
 
     def test_omit_callers(self):
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -172,7 +172,7 @@ class VRCGraphTest(unittest.TestCase):
         self.assertTrue(graph.filter_node("c", False))
 
     def test_omit_callees_check_callers(self):
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -188,7 +188,7 @@ class VRCGraphTest(unittest.TestCase):
         # TODO: test that c -> b and e -> a are in the DOT output
 
     def test_omit_callers_check_callees(self):
-        graph = vrc.Graph()
+        graph = Graph()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
