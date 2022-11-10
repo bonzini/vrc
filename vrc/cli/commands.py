@@ -193,7 +193,11 @@ class LoadCommand(VRCCommand):
         def expand_glob(s: str) -> list[str]:
             return glob.glob(s) or [s]
 
-        def resolve(files: typing.Iterator[str]) -> typing.Iterator[str]:
+        def parse_rtl(fn: str) -> None:
+            with open(fn, "r") as f:
+                GRAPH.parse(fn, f, verbose_print=args.verbose)
+
+        def resolve(files: typing.Iterator[str]) -> None:
             cwd = os.getcwd()
             for pattern in files:
                 for fn in expand_glob(os.path.join(cwd, os.path.expanduser(pattern))):
@@ -225,14 +229,12 @@ class LoadCommand(VRCCommand):
                             continue
 
                         print(f"Reading {os.path.relpath(dumps[0])}", file=sys.stderr)
-                        yield dumps[0]
+                        parse_rtl(dumps[0])
                     else:
                         args.verbose(f"Reading {os.path.relpath(fn)}")
-                        yield fn
+                        parse_rtl(fn)
 
-        for fn in resolve(args.files):
-            with open(fn, "r") as f:
-                GRAPH.parse(fn, f, verbose_print=args.verbose)
+        resolve(args.files)
 
 
 class NodeCommand(VRCCommand):
