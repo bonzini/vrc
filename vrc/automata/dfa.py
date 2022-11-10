@@ -1,0 +1,60 @@
+#! /usr/bin/env python3
+
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Copyright (C) 2022 Paolo Bonzini
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+from . import Automaton
+import dataclasses
+import typing
+
+
+@dataclasses.dataclass
+class DFA(Automaton[typing.Optional[int]]):
+    transition: list[dict[str, int]]
+    final: set[int]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.transition = []
+        self.final = set()
+
+    def add_state(self) -> int:
+        """Add a state to the automaton and return its integer identifier."""
+        self.transition.append(dict())
+        return len(self.transition) - 1
+
+    def mark_final(self, state: int) -> None:
+        """Mark a state as final.  A visit that terminates on the state
+           will be considered successful."""
+        assert state >= 0 and state < len(self.transition)
+        self.final.add(state)
+
+    def add_transition(self, source: int, symbol: str, dest: int) -> None:
+        """Add a transition for the given symbol from a source node
+           ``source`` to a destination node ``dest``.  The transition
+           replaces previous transitions with the given source and
+           symbol."""
+        self.transition[source][symbol] = dest
+
+    def initial(self) -> typing.Optional[int]:
+        """Return the initial state of a visit on the NFA."""
+        return 0 if self.transition else None
+
+    def advance(self, source: typing.Optional[int], symbol: str) -> typing.Optional[int]:
+        """Advance the automaton through the transition labeled
+           with the symbol ``symbol``."""
+        if source is None:
+            return None
+        return self.transition[source].get(symbol, None)
+
+    def is_failure(self, state: typing.Optional[int]) -> bool:
+        return state is None
+
+    def is_final(self, state: typing.Optional[int]) -> bool:
+        return state is not None and state in self.final
