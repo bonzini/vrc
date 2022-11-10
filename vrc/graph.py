@@ -46,6 +46,7 @@ class Graph:
     omitted: set[str]
     omitting_callers: set[str]    # Edges directed to these nodes are ignored
     omitting_callees: set[str]    # Edges starting from these nodes are ignored
+    node_labels: dict[str, set[str]]
     filter_default: bool
 
     def __init__(self):
@@ -54,6 +55,7 @@ class Graph:
         self.nodes_by_file = defaultdict(lambda: list())
 
         self.reset_filter()
+        self.reset_labels()
 
     def parse(self, fn: str, lines: typing.Iterator[str], verbose_print) -> None:
         RE_FUNC1 = re.compile(r"^;; Function (\S+)\s*$")
@@ -244,6 +246,22 @@ class Graph:
         self.keep.add(name)
         if name in self.omitted:
             self.omitted.remove(name)
+
+    def labels(self) -> set[str]:
+        return set(self.node_labels.keys())
+
+    def labeled_nodes(self, label: str) -> set[str]:
+        return self.node_labels[label]
+
+    def add_label(self, node: str, label: str) -> None:
+        self.node_labels[label].add(node)
+
+    def has_label(self, node: str, label: str) -> bool:
+        # check label first to avoid associating the key with an empty set
+        return (label in self.node_labels) and (node in self.node_labels[label])
+
+    def reset_labels(self) -> None:
+        self.node_labels = defaultdict(lambda: set())
 
     def reset_filter(self) -> None:
         self.omitted = set()

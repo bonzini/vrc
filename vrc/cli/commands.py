@@ -58,6 +58,11 @@ class FileCompleter(Completer):
         return result
 
 
+class LabelCompleter(Completer):
+    def get_completions(self, text: str) -> typing.Iterable[str]:
+        return GRAPH.labels()
+
+
 class NodeCompleter(Completer):
     def get_completions(self, text: str) -> typing.Iterable[str]:
         return set(GRAPH.nodes_by_username.keys()).union(GRAPH.nodes.keys())
@@ -349,6 +354,30 @@ class OnlyCommand(VRCCommand):
                     GRAPH.keep_node(callee)
 
 
+class LabelCommand(VRCCommand):
+    """Applies or queries labels to nodes."""
+    NAME = ("label",)
+
+    @classmethod
+    def args(self, parser: argparse.ArgumentParser):
+        parser.add_argument("label", metavar="LABEL",
+                            help="The label to operate on")
+        parser.add_argument("funcs", metavar="FUNCS", nargs="*",
+                            help="The functions to be labeled, print currently labeled functions if absent")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return LabelCompleter() if nwords == 1 else NodeCompleter()
+
+    def run(self, args: argparse.Namespace):
+        if args.funcs:
+            for f in args.funcs:
+                GRAPH.add_label(f, args.label)
+        else:
+            for f in GRAPH.labeled_nodes(args.label):
+                print(f)
+
+
 class ResetCommand(VRCCommand):
     """Undoes any filtering done by the "keep" or "omit" commands,
        and/or all labeling."""
@@ -356,10 +385,17 @@ class ResetCommand(VRCCommand):
 
     @classmethod
     def args(self, parser: argparse.ArgumentParser):
-        pass
+        parser.add_argument("--filters", action="store_true",
+                            help="Reset all filters.")
+        parser.add_argument("--labels", action="store_true",
+                            help="Reset all labels.")
 
     def run(self, args: argparse.Namespace):
-        GRAPH.reset_filter()
+        reset_all = not args.labels and not args.filters
+        if reset_all or args.filters:
+            GRAPH.reset_filter()
+        if reset_all or args.labels:
+            GRAPH.reset_labels()
 
 
 class CallersCommand(VRCCommand):
