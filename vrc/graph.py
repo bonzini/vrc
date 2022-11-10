@@ -116,6 +116,15 @@ class Graph:
     def has_node(self, name: str) -> bool:
         return bool(self._get_node(name))
 
+    def is_node_external(self, name: str) -> bool:
+        node = self._get_node(name)
+        return bool(node and node.external)
+
+    def edge_type(self, src: str, dest: str) -> str:
+        node = self._get_node(src)
+        assert node
+        return node[dest]
+
     def _visit(self, start: str, targets: typing.Callable[[Node], typing.Iterable[str]]) -> typing.Iterator[str]:
         visited = set()
 
@@ -157,10 +166,13 @@ class Graph:
                 for callee in n.callees.keys()
                 if self.filter_node(callee, external_ok) and self.filter_edge(caller, callee, ref_ok))
 
-    def all_nodes(self) -> typing.Iterator[str]:
+    def all_files(self) -> typing.Iterator[str]:
+        return iter(self.nodes_by_file.keys())
+
+    def all_nodes(self, external_ok: bool) -> typing.Iterator[str]:
         return (self.name(x)
                 for x in self.nodes.keys()
-                if self.filter_node(x, False))
+                if self.filter_node(x, external_ok))
 
     def all_nodes_for_file(self, file: str) -> typing.Iterator[str]:
         return (self.name(x)

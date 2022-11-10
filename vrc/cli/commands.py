@@ -12,6 +12,7 @@
 import argparse
 from .. import graph
 from collections import defaultdict
+from contextlib import contextmanager
 import glob
 import io
 import json
@@ -25,6 +26,21 @@ import typing
 
 
 GRAPH = graph.Graph()
+
+
+@contextmanager
+def open_unlink_on_error(filename: str) -> typing.Iterator[io.TextIOWrapper]:
+    # do not unlink an existing file until it has been opened
+    do_unlink = not os.path.exists(filename)
+    try:
+        with open(filename, "w") as f:
+            # and never unlink a non-regular file anyway
+            do_unlink = do_unlink or os.path.isfile(filename)
+            yield f
+    except Exception as e:
+        if do_unlink:
+            os.unlink(filename)
+        raise e
 
 
 class Completer:
@@ -238,18 +254,25 @@ class LoadCommand(VRCCommand):
 
 
 class NodeCommand(VRCCommand):
-    """Creates a new node for a non-external symbol."""
+    """Creates a new node for a symbol."""
     NAME = ("node",)
 
     @classmethod
     def args(self, parser: argparse.ArgumentParser):
+        parser.add_argument("--external", action="store_true",
+                            help="Make the symbol external.")
         parser.add_argument("name", metavar="NAME",
                             help="Name for the new node")
         parser.add_argument("file", metavar="FILE", nargs="?",
                             help="File in which the new node is defined")
 
     def run(self, args: argparse.Namespace):
-        GRAPH.add_node(args.name, file=args.file)
+        if args.external and args.file:
+            raise argparse.ArgumentError(None, "file not allowed for external symbols")
+        if args.external:
+            GRAPH.add_external_node(args.name)
+        else:
+            GRAPH.add_node(args.name, file=args.file)
 
 
 class EdgeCommand(VRCCommand):
@@ -277,6 +300,8 @@ class EdgeCommand(VRCCommand):
     def run(self, args: argparse.Namespace):
         if not GRAPH.has_node(args.caller):
             raise argparse.ArgumentError(None, "caller not found in graph")
+        if GRAPH.is_node_external(args.caller):
+            raise argparse.ArgumentError(None, "cannot add edge from external node")
         GRAPH.add_edge(args.caller, args.callee, args.type)
 
 
@@ -464,6 +489,47 @@ class CalleesCommand(VRCCommand):
             print(f"{', '.join(callers)} -> {callee}")
 
 
+class SaveCommand(VRCCommand):
+    """Creates a command file with the callgraph."""
+    NAME = ("save", )
+
+    @classmethod
+    def args(self, parser: argparse.ArgumentParser):
+        parser.add_argument("file", metavar="FILE", nargs="?")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return FileCompleter() if nwords == 1 else Completer()
+
+    def run(self, args: argparse.Namespace):
+        def emit(f):
+            node_to_file = dict()
+            for file in GRAPH.all_files():
+                for node in GRAPH.all_nodes_for_file(file):
+                    node_to_file[node] = file
+
+            for node in GRAPH.all_nodes(True):
+                if GRAPH.is_node_external(node):
+                    print("node", "--external", node, file=f)
+                else:
+                    print("node", node, node_to_file.get(node, ""), file=f)
+
+            for label in sorted(GRAPH.labels()):
+                for node in GRAPH.labeled_nodes(label):
+                    print("label", label, node, file=f)
+
+            for node in GRAPH.all_nodes(False):
+                for target in GRAPH.callees(node, True, True):
+                    print("edge", node, target, GRAPH.edge_type(node, target), file=f)
+
+        if args.file:
+            fn = os.path.expanduser(args.file)
+            with open_unlink_on_error(fn) as f:
+                emit(f)
+        else:
+            emit(sys.stdout)
+
+
 class OutputCommand(VRCCommand):
     """Creates a DOT file with the callgraph.  If invoked as "dotty" and
        with no arguments, the graph is laid out and showed in a graphical
@@ -488,7 +554,7 @@ class OutputCommand(VRCCommand):
         def emit(f):
             print("digraph callgraph {", file=f)
             nodes = set()
-            for func in GRAPH.all_nodes():
+            for func in GRAPH.all_nodes(False):
                 nodes.add(func)
 
             if args.files:
@@ -523,17 +589,8 @@ class OutputCommand(VRCCommand):
 
         if args.file:
             fn = os.path.expanduser(args.file)
-            # do not unlink an existing file until it has been opened
-            do_unlink = not os.path.exists(args.file)
-            try:
-                with open(fn, "w") as f:
-                    # and never unlink a non-regular file anyway
-                    do_unlink = do_unlink or os.path.isfile(args.file)
-                    emit(f)
-            except Exception as e:
-                if do_unlink:
-                    os.unlink(fn)
-                raise e
+            with open_unlink_on_error(fn) as f:
+                emit(f)
         elif args.cmd == "dotty":
             graph = io.StringIO()
             emit(graph)

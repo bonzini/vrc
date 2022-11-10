@@ -3,12 +3,49 @@ from vrc.graph import Graph
 
 
 class VRCGraphTest(unittest.TestCase):
+    def test_add_node(self):
+        """Check creating nodes."""
+        graph = Graph()
+        graph.add_node("a")
+        self.assertTrue(graph.has_node("a"))
+        self.assertFalse(graph.is_node_external("a"))
+        graph.add_external_node("b")
+        self.assertTrue(graph.has_node("b"))
+        self.assertTrue(graph.is_node_external("b"))
+
+    def test_add_edge(self):
+        """Check creating nodes."""
+        graph = Graph()
+        graph.add_node("a")
+        graph.add_node("b")
+        graph.add_node("c")
+        graph.add_edge("a", "b", "call")
+        graph.add_edge("a", "c", "ref")
+        self.assertTrue(graph.edge_type("a", "b") == "call")
+        self.assertTrue(graph.edge_type("a", "c") == "ref")
+
+    def test_all_files(self):
+        """Check creating nodes with files."""
+        graph = Graph()
+        graph.add_node("a", file="f.c")
+        graph.add_node("b", file="g.c")
+        self.assertEqual(sorted(graph.all_files()), ["f.c", "g.c"])
+
+    def test_all_nodes(self):
+        """Check retrieving the list of defined nodes."""
+        graph = Graph()
+        graph.add_node("a")
+        graph.add_external_node("b")
+        self.assertEqual(sorted(graph.all_nodes(False)), ["a"])
+        self.assertEqual(sorted(graph.all_nodes(True)), ["a", "b"])
+
     def test_edge_to_nonexisting_node(self):
         """Check creating an edge to a function that is not defined."""
         graph = Graph()
         graph.add_node("a")
         graph.add_edge("a", "b", "call")
         self.assertTrue(graph.has_node("b"))
+        self.assertTrue(graph.is_node_external("b"))
         self.assertTrue(graph.filter_node("a", False))
         self.assertFalse(graph.filter_node("b", False))
         self.assertTrue(graph.filter_node("b", True))
