@@ -11,10 +11,10 @@ setup(
     long_description_content_type='text/markdown',
     author='Paolo Bonzini',
     author_email='bonzini@gnu.org',
-    packages=['vrc'],
+    packages=['vrc', 'vrc.cli'],
     entry_points={
         'console_scripts': [
-            'vrc = vrc.__main__:main',
+            'vrc = vrc.cli.main:main',
         ]
     }
 )
