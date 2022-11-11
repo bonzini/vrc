@@ -33,6 +33,7 @@ class NFA(Automaton[StateSet]):
         self.transition = []
         self.epsilon = []
         self.final = set()
+        self.epsilon_closure_cache: typing.Optional[dict[int, StateSet]] = None
 
     def add_state(self) -> int:
         """Add a state to the automaton and return its integer identifier."""
@@ -51,6 +52,7 @@ class NFA(Automaton[StateSet]):
            happen nondeterministically as soon as the automaton
            reaches the source state."""
         self.epsilon[source].append(dest)
+        self.epsilon_closure_cache = None
 
     def add_transition(self, source: int, m: Matcher, dest: int) -> None:
         """Add a transition from a source node ``source`` to a
@@ -58,10 +60,7 @@ class NFA(Automaton[StateSet]):
            symbol ``sym`` if ``m(sym)`` is True."""
         self.transition[source].append((m, dest))
 
-    def epsilon_closure(self, state: int) -> StateSet:
-        """Return the epsilon closure of the given state, i.e.
-           the states from which the automaton can advance on the
-           next transition."""
+    def _epsilon_closure(self, state: int) -> StateSet:
         epsilon = self.epsilon
         curr: StateSet = {}
         states = {state}
@@ -73,6 +72,16 @@ class NFA(Automaton[StateSet]):
                     states.update(epsilon[state])
             if len(states) == len(curr):
                 return curr
+
+    def epsilon_closure(self, state: int) -> StateSet:
+        """Return the epsilon closure of the given state, i.e.
+           the states from which the automaton can advance on the
+           next transition."""
+        if not self.epsilon_closure_cache:
+            self.epsilon_closure_cache = dict()
+        if state not in self.epsilon_closure_cache:
+            self.epsilon_closure_cache[state] = self._epsilon_closure(state)
+        return self.epsilon_closure_cache[state]
 
     def initial(self) -> StateSet:
         """Return the initial state of a visit on the NFA."""
