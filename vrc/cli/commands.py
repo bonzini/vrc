@@ -29,7 +29,7 @@ GRAPH = graph.Graph()
 
 
 @contextmanager
-def open_unlink_on_error(filename: str) -> typing.Iterator[io.TextIOWrapper]:
+def open_unlink_on_error(filename: str) -> typing.Iterator[typing.TextIO]:
     # do not unlink an existing file until it has been opened
     do_unlink = not os.path.exists(filename)
     try:
@@ -52,7 +52,7 @@ class Completer:
 
 
 class FileCompleter(Completer):
-    def __init__(self, glob_patterns: list[str] = ['*']):
+    def __init__(self, glob_patterns: list[str] = ['*']) -> None:
         self.glob_patterns = glob_patterns
 
     def try_to_expand(self, text: str) -> str:
@@ -75,7 +75,7 @@ class FileCompleter(Completer):
 
 
 class StringsCompleter(Completer):
-    def __init__(self, strings: list[str]):
+    def __init__(self, strings: list[str]) -> None:
         self.strings = strings
 
     def get_completions(self, text: str) -> typing.Iterable[str]:
@@ -97,7 +97,7 @@ class VRCCommand:
     NAME: typing.Optional[tuple[str, ...]] = None
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         """Setup argument parser"""
         pass
 
@@ -105,7 +105,7 @@ class VRCCommand:
     def get_completer(cls, nwords: int) -> Completer:
         return Completer()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         pass
 
 
@@ -114,7 +114,7 @@ class ChdirCommand(VRCCommand):
     NAME = ("cd",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("dir", metavar="DIR",
                             help="New current directory")
 
@@ -123,7 +123,7 @@ class ChdirCommand(VRCCommand):
         # complete by directory only
         return FileCompleter([]) if nwords == 1 else Completer()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         os.chdir(os.path.expanduser(args.dir))
 
 
@@ -131,7 +131,7 @@ class PwdCommand(VRCCommand):
     """Print current directory."""
     NAME = ("pwd",)
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         print(os.getcwd())
 
 
@@ -139,7 +139,7 @@ class HistoryCommand(VRCCommand):
     """Print command history."""
     NAME = ("history",)
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         # TODO: limit history to N entries
         for i in range(1, readline.get_current_history_length() + 1):
             print('{:7} {}'.format(i, readline.get_history_item(i)))
@@ -150,7 +150,7 @@ class CompdbCommand(VRCCommand):
     NAME = ("compdb",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("file", metavar="FILE",
                             help="JSON file to be loaded")
 
@@ -158,7 +158,7 @@ class CompdbCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter(["*.json"]) if nwords == 1 else Completer()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         with open(args.file, 'r') as f:
             for entry in json.load(f):
                 key = os.path.abspath(os.path.join(entry["directory"], entry["output"]))
@@ -173,7 +173,7 @@ class LoadCommand(VRCCommand):
     NAME = ("load",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         def eat(*args: list[typing.Any]) -> None:
             pass
 
@@ -190,8 +190,8 @@ class LoadCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter(["*.o", "*r.expand"])
 
-    def run(self, args: argparse.Namespace):
-        def build_gcc_S_command_line(cmd, outfile):
+    def run(self, args: argparse.Namespace) -> None:
+        def build_gcc_S_command_line(cmd: str, outfile: str) -> list[str]:
             args = shlex.split(cmd)
             out = []
             was_o = False
@@ -258,7 +258,7 @@ class NodeCommand(VRCCommand):
     NAME = ("node",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--external", action="store_true",
                             help="Make the symbol external.")
         parser.add_argument("name", metavar="NAME",
@@ -266,7 +266,7 @@ class NodeCommand(VRCCommand):
         parser.add_argument("file", metavar="FILE", nargs="?",
                             help="File in which the new node is defined")
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         if args.external and args.file:
             raise argparse.ArgumentError(None, "file not allowed for external symbols")
         if args.external:
@@ -280,7 +280,7 @@ class EdgeCommand(VRCCommand):
     NAME = ("edge",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("caller", metavar="CALLER",
                             help="Source node for the new edge")
         parser.add_argument("callee", metavar="CALLEE",
@@ -297,7 +297,7 @@ class EdgeCommand(VRCCommand):
             return StringsCompleter(["call", "ref"])
         return Completer()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         if not GRAPH.has_node(args.caller):
             raise argparse.ArgumentError(None, "caller not found in graph")
         if GRAPH.is_node_external(args.caller):
@@ -311,7 +311,7 @@ class OmitCommand(VRCCommand):
     NAME = ("omit",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--callers", action="store_true",
                             help="Omit all callers, recursively.")
         parser.add_argument("--callees", action="store_true",
@@ -323,7 +323,7 @@ class OmitCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return NodeCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         for f in args.funcs:
             if not args.callers and not args.callees:
                 GRAPH.omit_node(f)
@@ -342,7 +342,7 @@ class KeepCommand(VRCCommand):
     NAME = ("keep",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--callers", action="store_true",
                             help="Keep all callers, recursively.")
         parser.add_argument("--callees", action="store_true",
@@ -354,7 +354,7 @@ class KeepCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return NodeCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         for f in args.funcs:
             GRAPH.keep_node(f)
             if args.callers:
@@ -373,7 +373,7 @@ class OnlyCommand(VRCCommand):
     NAME = ("only",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--callers", action="store_true",
                             help="Keep all callers, recursively.")
         parser.add_argument("--callees", action="store_true",
@@ -381,7 +381,7 @@ class OnlyCommand(VRCCommand):
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         GRAPH.filter_default = False
         for f in args.funcs:
             GRAPH.keep_node(f)
@@ -398,7 +398,7 @@ class LabelCommand(VRCCommand):
     NAME = ("label",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("label", metavar="LABEL",
                             help="The label to operate on")
         parser.add_argument("funcs", metavar="FUNCS", nargs="*",
@@ -408,7 +408,7 @@ class LabelCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return LabelCompleter() if nwords == 1 else NodeCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         if args.funcs:
             for f in args.funcs:
                 GRAPH.add_label(f, args.label)
@@ -423,13 +423,13 @@ class ResetCommand(VRCCommand):
     NAME = ("reset",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--filters", action="store_true",
                             help="Reset all filters.")
         parser.add_argument("--labels", action="store_true",
                             help="Reset all labels.")
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         reset_all = not args.labels and not args.filters
         if reset_all or args.filters:
             GRAPH.reset_filter()
@@ -442,7 +442,7 @@ class CallersCommand(VRCCommand):
     NAME = ("callers",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--include-ref", action="store_true",
                             help="Include references to functions.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
@@ -452,7 +452,7 @@ class CallersCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return NodeCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         result = defaultdict(lambda: list())
         for f in args.funcs:
             for i in GRAPH.callers(f, ref_ok=args.include_ref):
@@ -467,7 +467,7 @@ class CalleesCommand(VRCCommand):
     NAME = ("callees",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--include-external", action="store_true",
                             help="Include external functions.")
         parser.add_argument("--include-ref", action="store_true",
@@ -479,7 +479,7 @@ class CalleesCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return NodeCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         result = defaultdict(lambda: list())
         for f in args.funcs:
             for i in GRAPH.callees(f, external_ok=args.include_external, ref_ok=args.include_ref):
@@ -494,15 +494,15 @@ class SaveCommand(VRCCommand):
     NAME = ("save", )
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("file", metavar="FILE", nargs="?")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter() if nwords == 1 else Completer()
 
-    def run(self, args: argparse.Namespace):
-        def emit(f):
+    def run(self, args: argparse.Namespace) -> None:
+        def emit(f: typing.TextIO) -> None:
             node_to_file = dict()
             for file in GRAPH.all_files():
                 for node in GRAPH.all_nodes_for_file(file):
@@ -537,7 +537,7 @@ class OutputCommand(VRCCommand):
     NAME = ("output", "dotty")
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--files", action="store_true",
                             help="Create box containers for source files.")
         parser.add_argument("--include-external", action="store_true",
@@ -550,10 +550,10 @@ class OutputCommand(VRCCommand):
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter() if nwords == 1 else Completer()
 
-    def run(self, args: argparse.Namespace):
-        def emit(f):
+    def run(self, args: argparse.Namespace) -> None:
+        def emit(f: typing.TextIO) -> None:
             print("digraph callgraph {", file=f)
-            nodes = set()
+            nodes: set[str] = set()
             for func in GRAPH.all_nodes(False):
                 nodes.add(func)
 
@@ -561,7 +561,9 @@ class OutputCommand(VRCCommand):
                 i = 0
                 for file in GRAPH.nodes_by_file.keys():
                     file_nodes = list(GRAPH.all_nodes_for_file(file))
-                    label = re.match(r'(.*?)\.[0-9]*r\.expand', os.path.relpath(file)).group(1)
+                    m = re.match(r'(.*?)\.[0-9]*r\.expand', os.path.relpath(file))
+                    assert m is not None
+                    label = m.group(1)
                     if not file_nodes:
                         continue
                     print(f"subgraph cluster_{i}", "{", file=f)
@@ -574,9 +576,9 @@ class OutputCommand(VRCCommand):
             connected = set()
             for func in nodes:
                 has_edges = False
-                for i in GRAPH.callees(func, external_ok=args.include_external, ref_ok=args.include_ref):
-                    print(f'"{func}" -> "{i}";', file=f)
-                    connected.add(i)
+                for dest in GRAPH.callees(func, external_ok=args.include_external, ref_ok=args.include_ref):
+                    print(f'"{func}" -> "{dest}";', file=f)
+                    connected.add(dest)
                     has_edges = True
                 if has_edges:
                     connected.add(func)

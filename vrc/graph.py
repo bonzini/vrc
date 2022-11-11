@@ -23,7 +23,7 @@ class Node:
     username: typing.Optional[str] = None
     external: bool = True
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         super().__init__()
         self.name = name
         self.callers = set()
@@ -32,7 +32,7 @@ class Node:
     def __getitem__(self, callee: str) -> str:
         return self.callees[callee]
 
-    def __setitem__(self, callee: str, type: str):
+    def __setitem__(self, callee: str, type: str) -> None:
         # A "ref" edge does not override a "call" edge
         if type == "call" or callee not in self.callees:
             self.callees[callee] = type
@@ -49,7 +49,7 @@ class Graph:
     node_labels: dict[str, set[str]]
     filter_default: bool
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes = {}
         self.nodes_by_username = {}
         self.nodes_by_file = defaultdict(lambda: list())
@@ -57,7 +57,7 @@ class Graph:
         self.reset_filter()
         self.reset_labels()
 
-    def parse(self, fn: str, lines: typing.Iterator[str], verbose_print) -> None:
+    def parse(self, fn: str, lines: typing.Iterator[str], verbose_print: typing.Callable[[str], None]) -> None:
         RE_FUNC1 = re.compile(r"^;; Function (\S+)\s*$")
         RE_FUNC2 = re.compile(r"^;; Function (.*)\s+\((\S+)(,.*)?\).*$")
         RE_SYMBOL_REF = re.compile(r'\(symbol_ref [^(]* \( "([^"]*)"', flags=re.X)

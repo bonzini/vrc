@@ -11,7 +11,6 @@
 
 import argparse
 import itertools
-import io
 import os
 import readline
 import sys
@@ -27,13 +26,13 @@ class NoUsageFormatter(argparse.HelpFormatter):
 
 
 class MyArgumentParser(argparse.ArgumentParser):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: list[typing.Any], **kwargs: dict[typing.Any, typing.Any]) -> None:
         super().__init__(exit_on_error=False, add_help=False, formatter_class=NoUsageFormatter)
 
-    def format_usage(self):
+    def format_usage(self) -> str:
         return ""
 
-    def error(self, message: str):
+    def error(self, message: str) -> typing.NoReturn:
         raise argparse.ArgumentError(None, f"{self.prog}: error: {message}" "")
 
 
@@ -45,7 +44,7 @@ class QuitCommand(VRCCommand):
     NAME = ("q", "quit")
 
     @classmethod
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         sys.exit(0)
 
 
@@ -54,19 +53,19 @@ class SourceCommand(VRCCommand):
     NAME = ("source",)
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("file", metavar="FILE")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter()
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         with open(args.file, "r") as f:
             self.do_source(f, exit_first=True)
 
     @staticmethod
-    def do_source(inf: io.TextIOWrapper, exit_first: bool):
+    def do_source(inf: typing.Iterator[str], exit_first: bool) -> None:
         while True:
             try:
                 line = next(inf)
@@ -102,15 +101,15 @@ class HelpCommand(VRCCommand):
     PARSERS: dict[str, argparse.ArgumentParser] = {}
 
     @classmethod
-    def args(self, parser: argparse.ArgumentParser):
+    def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("command", metavar="COMMAND", nargs="?",
                             help="Show help for given command.")
 
     @classmethod
-    def register(self, command: str, parser: argparse.ArgumentParser):
+    def register(self, command: str, parser: argparse.ArgumentParser) -> None:
         self.PARSERS[command] = parser
 
-    def run(self, args: argparse.Namespace):
+    def run(self, args: argparse.Namespace) -> None:
         if args.command and args.command in self.PARSERS:
             self.PARSERS[args.command].print_help()
         else:
@@ -126,20 +125,20 @@ class ReadlineInput:
     CMDCLASSES: dict[str, typing.Type[VRCCommand]] = {}
 
     @classmethod
-    def register(self, command: str, cls: typing.Type[VRCCommand]):
+    def register(self, command: str, cls: typing.Type[VRCCommand]) -> None:
         self.CMDCLASSES[command] = cls
 
-    def __init__(self, prompt: str):
+    def __init__(self, prompt: str) -> None:
         self.prompt = prompt
         readline.parse_and_bind("tab: complete")
         readline.set_completer(self.complete)
         readline.set_completer_delims(' \t')
         readline.set_completion_display_matches_hook(self.display_matches)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[str]:
         return self
 
-    def __next__(self):
+    def __next__(self) -> str:
         try:
             return input(self.prompt)
         except EOFError:
@@ -153,7 +152,7 @@ class ReadlineInput:
             return None
         return self.matches[state]
 
-    def get_matches(self, text: str):
+    def get_matches(self, text: str) -> list[str]:
         line = readline.get_line_buffer()
         words = line.strip().split()
         nwords = 0
@@ -196,7 +195,7 @@ class ReadlineInput:
         else:
             return self.CMDCLASSES[words[0]].get_completer(nwords)
 
-    def display_matches(self, substitution: str, matches: typing.Sequence[str], longest_match_length: int):
+    def display_matches(self, substitution: str, matches: typing.Sequence[str], longest_match_length: int) -> None:
         line_buffer = readline.get_line_buffer()
         columns = os.get_terminal_size()[0]
 
@@ -219,7 +218,7 @@ class ReadlineInput:
         sys.stdout.flush()
 
 
-def main():
+def main() -> None:
     if os.path.exists("compile_commands.json"):
         print("Loading compile_commands.json", file=sys.stderr)
         args = PARSER.parse_args(["compdb", "compile_commands.json"])
@@ -228,6 +227,7 @@ def main():
         except OSError as e:
             print("Could not load compile_commands.json:", e, file=sys.stderr)
 
+    inf: typing.Iterator[str]
     if os.isatty(0):
         inf = ReadlineInput("(vrc) ")
     else:
@@ -236,7 +236,7 @@ def main():
     SourceCommand.do_source(inf, exit_first=False)
 
 
-def init_subparsers():
+def init_subparsers() -> None:
     subparsers = PARSER.add_subparsers(title="subcommands", help=None, parser_class=MyArgumentParser)
     for cls in VRCCommand.__subclasses__():
         for n in cls.NAME:  # type: ignore
