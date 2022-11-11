@@ -11,6 +11,8 @@
 
 from . import Automaton
 from abc import ABCMeta
+from collections import defaultdict
+from .dfa import DFA
 import dataclasses
 import typing
 
@@ -109,3 +111,44 @@ class NFA(Automaton[StateSet]):
             if state in final:
                 return True
         return False
+
+    def dfa(self, alphabet: list[str]) -> DFA:
+        """Return a DFA that is equivalent to ``self``."""
+
+        dfa = DFA()
+        initial = frozenset(self.epsilon_closure(0))
+        statemap: dict[frozenset[int], int] = dict()
+        statemap[initial] = dfa.add_state()
+
+        # set of NFA statesets for which a DFA state has been created,
+        # but transitions have not been filled
+        queue = set([initial])
+        while queue:
+            sources = queue.pop()
+            dfasource = statemap[sources]
+            if self.is_final(sources):
+                dfa.mark_final(dfasource)
+
+            # collect all NFA transitions for the state being processed
+            transition: dict[str, set[int]] = defaultdict(lambda: set())
+            for source in sources:
+                for m, dest_state in self.transition[source]:
+                    for sym in alphabet:
+                        if m(sym):
+                            transition[sym].update(self.epsilon_closure(dest_state))
+
+            dest: StateSet
+            for sym, dest in transition.items():
+                # build a DFA transition for each symbol by looking up
+                # the DFA state corresponding to the next NFA state
+                dest = frozenset(dest)
+                s = statemap.get(dest)
+                if s is None:
+                    # create new DFA state
+                    s = dfa.add_state()
+                    statemap[dest] = s
+                    queue.add(dest)
+
+                dfa.add_transition(dfasource, sym, s)
+
+        return dfa

@@ -1,4 +1,6 @@
+import typing
 import unittest
+from vrc.automata import Automaton
 from vrc.automata.nfa import NFA
 from vrc.automata.regex import Empty, One, Sequence, Star, Alt
 
@@ -24,9 +26,8 @@ class NFATest(unittest.TestCase):
         nfa.add_transition(s3, "B".__eq__, s5)
         return nfa
 
-    def test_nfa(self) -> None:
-        nfa = self.sample_nfa()
-        v = nfa.visit()
+    def sample_visit(self, a: Automaton[typing.Any]) -> None:
+        v = a.visit()
         self.assertFalse(v.success())
         v.visit("A")
         self.assertFalse(v.success())
@@ -36,11 +37,15 @@ class NFATest(unittest.TestCase):
         self.assertFalse(v.success())
         v.visit("Y")
         self.assertTrue(v.success())
-        v = nfa.visit()
+        v = a.visit()
         v.visit("B")
         self.assertTrue(v.success())
         v.visit("A")
         self.assertFalse(v.success())
+
+    def test_nfa(self) -> None:
+        nfa = self.sample_nfa()
+        self.sample_visit(nfa)
 
     def test_matches(self) -> None:
         nfa = self.sample_nfa()
@@ -49,6 +54,10 @@ class NFATest(unittest.TestCase):
         self.assertTrue(nfa.matches(["B"]))
         self.assertFalse(nfa.matches(["foo"]))
         self.assertFalse(nfa.matches(["B", "A"]))
+
+    def test_nfa_to_dfa(self) -> None:
+        dfa = self.sample_nfa().dfa(["A", "B", "X", "Y"])
+        self.sample_visit(dfa)
 
 
 class RegexTest(unittest.TestCase):
