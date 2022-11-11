@@ -24,6 +24,59 @@ class StateSet(typing.Protocol, typing.Sized, typing.Iterable[int], metaclass=AB
     pass
 
 
+class LazyDFA(Automaton[typing.Optional[int]]):
+    nfa: 'NFA'
+    nfa_states: list[frozenset[int]]
+    transition: list[dict[str, typing.Optional[int]]]
+    statemap: dict[frozenset[int], int]
+    final: set[int]
+
+    def __init__(self, nfa: 'NFA'):
+        self.nfa = nfa
+        self.nfa_states = list()
+        self.transition = list()
+        self.statemap = dict()
+        self.final = set()
+
+    def _dfa_state(self, states: StateSet) -> typing.Optional[int]:
+        """Return the DFA state corresponding to the given set of NFA states."""
+        if not states:
+            return None
+
+        states = frozenset(states)
+        dfa_state = self.statemap.get(states)
+        if dfa_state is None:
+            dfa_state = self.statemap[states] = len(self.statemap)
+            self.nfa_states.append(states)
+            self.transition.append(dict())
+            if self.nfa.is_final(states):
+                self.final.add(dfa_state)
+
+        return dfa_state
+
+    def initial(self) -> typing.Optional[int]:
+        if not self.nfa.transition:
+            return None
+        return self._dfa_state(self.nfa.initial())
+
+    def advance(self, source: typing.Optional[int], symbol: str) -> typing.Optional[int]:
+        """Advance the automaton based on the transitions labeled
+           with the symbol ``symbol``."""
+        if source is None:
+            return None
+
+        trans = self.transition[source]
+        if symbol not in trans:
+            trans[symbol] = self._dfa_state(self.nfa.advance(self.nfa_states[source], symbol))
+        return trans[symbol]
+
+    def is_failure(self, state: typing.Optional[int]) -> bool:
+        return state is None
+
+    def is_final(self, state: typing.Optional[int]) -> bool:
+        return state is not None and state in self.final
+
+
 @dataclasses.dataclass
 class NFA(Automaton[StateSet]):
     transition: list[list[typing.Tuple[Matcher, int]]]
@@ -152,3 +205,8 @@ class NFA(Automaton[StateSet]):
                 dfa.add_transition(dfasource, sym, s)
 
         return dfa
+
+    def lazy_dfa(self) -> LazyDFA:
+        """Return an object that will perform a visit on the NFA using
+           lazy DFA construction."""
+        return LazyDFA(self)

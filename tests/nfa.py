@@ -55,6 +55,10 @@ class NFATest(unittest.TestCase):
         self.assertFalse(nfa.matches(["foo"]))
         self.assertFalse(nfa.matches(["B", "A"]))
 
+    def test_lazy_dfa(self) -> None:
+        dfa = self.sample_nfa().lazy_dfa()
+        self.sample_visit(dfa)
+
     def test_nfa_to_dfa(self) -> None:
         dfa = self.sample_nfa().dfa(["A", "B", "X", "Y"])
         self.sample_visit(dfa)
