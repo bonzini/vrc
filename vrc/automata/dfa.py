@@ -10,6 +10,7 @@
 # (at your option) any later version.
 
 from . import Automaton
+from collections import defaultdict
 import dataclasses
 import typing
 
@@ -58,3 +59,65 @@ class DFA(Automaton[typing.Optional[int]]):
 
     def is_final(self, state: typing.Optional[int]) -> bool:
         return state is not None and state in self.final
+
+    def reverse(self) -> 'DFA':
+        """Return a DFA that matches the reflections of the strings
+           matched by ``self``."""
+
+        # build the reverse NFA.  self.final is the initial state
+        # (see below), 0 is the final state.  What's left is the
+        # transition table.
+        transition: list[dict[str, list[int]]] = \
+            [defaultdict(lambda: list()) for _ in self.transition]
+
+        for source, direct in enumerate(self.transition):
+            for sym, target in direct.items():
+                transition[target][sym].append(source)
+
+        # This is mostly the same as NFA.nfa_to_dfa but, unlike it,
+        # it does not need an alphabet because there the reverse NFA
+        # only matches a given symbol for each edge of the transition
+        # table.  Also, all of the reverse NFA's epsilon transitions are
+        # from a dummy initial state to self.final, so they can be
+        # hardcoded here and ignored in the loop below.
+        result = DFA()
+        initial = frozenset(self.final)
+        statemap: dict[frozenset[int], int] = dict()
+        statemap[initial] = result.add_state()
+
+        # set of reverse NFA statesets for which a DFA state has been
+        # created, but transitions have not been filled
+        queue = set([initial])
+        while queue:
+            sources = queue.pop()
+            revsource = statemap[sources]
+            if 0 in sources:
+                result.mark_final(revsource)
+
+            symbols: set[str] = set().union(*[
+                transition[source].keys()
+                for source in sources])
+
+            # build a DFA transition for each symbol by looking up
+            # the DFA state corresponding to the next NFA state
+            for sym in symbols:
+                dest: frozenset[int] = frozenset().union(*[
+                    transition[source][sym]
+                    for source in sources
+                    if sym in transition[source]])
+
+                s = statemap.get(dest)
+                if s is None:
+                    # create new DFA state
+                    s = result.add_state()
+                    statemap[dest] = s
+                    queue.add(dest)
+
+                result.add_transition(revsource, sym, s)
+
+        return result
+
+    def minimal(self) -> 'DFA':
+        """Return a DFA that is equivalent to ``self`` but has a minimal
+           number of states."""
+        return self.reverse().reverse()
