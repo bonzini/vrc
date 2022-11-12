@@ -1,5 +1,6 @@
 import unittest
 from vrc.automata.nfa import NFA
+from vrc.automata.regex import Empty, One, Sequence, Star, Alt
 
 
 class NFATest(unittest.TestCase):
@@ -48,3 +49,74 @@ class NFATest(unittest.TestCase):
         self.assertTrue(nfa.matches(["B"]))
         self.assertFalse(nfa.matches(["foo"]))
         self.assertFalse(nfa.matches(["B", "A"]))
+
+
+class RegexTest(unittest.TestCase):
+    def test_empty(self) -> None:
+        nfa = Empty().nfa()
+        self.assertTrue(nfa.matches(""))
+        self.assertFalse(nfa.matches("a"))
+
+    def test_one(self) -> None:
+        nfa = One("a".__eq__).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertTrue(nfa.matches("a"))
+        self.assertFalse(nfa.matches("b"))
+        self.assertFalse(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+    def test_sequence(self) -> None:
+        nfa = Sequence().nfa()
+        self.assertTrue(nfa.matches(""))
+        self.assertFalse(nfa.matches("a"))
+
+        nfa = Sequence(One("a".__eq__)).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertTrue(nfa.matches("a"))
+        self.assertFalse(nfa.matches("b"))
+        self.assertFalse(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+        nfa = Sequence(One("a".__eq__), Empty()).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertTrue(nfa.matches("a"))
+        self.assertFalse(nfa.matches("b"))
+        self.assertFalse(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+        nfa = Sequence(One("a".__eq__), One("b".__eq__)).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertFalse(nfa.matches("a"))
+        self.assertFalse(nfa.matches("b"))
+        self.assertTrue(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+        nfa = Sequence(Empty(), One("a".__eq__), One("b".__eq__)).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertFalse(nfa.matches("a"))
+        self.assertFalse(nfa.matches("b"))
+        self.assertTrue(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+        nfa = Sequence(One("a".__eq__), One(lambda x: True), One("c".__eq__)).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertFalse(nfa.matches("a"))
+        self.assertFalse(nfa.matches("ac"))
+        self.assertTrue(nfa.matches("abc"))
+        self.assertTrue(nfa.matches(["a", "foo", "c"]))
+
+    def test_alt(self) -> None:
+        nfa = Alt(One("a".__eq__), One("b".__eq__)).nfa()
+        self.assertFalse(nfa.matches(""))
+        self.assertTrue(nfa.matches("a"))
+        self.assertTrue(nfa.matches("b"))
+        self.assertFalse(nfa.matches("ab"))
+        self.assertFalse(nfa.matches("ba"))
+
+    def test_star(self) -> None:
+        nfa = Star(One("a".__eq__)).nfa()
+        self.assertTrue(nfa.matches(""))
+        self.assertTrue(nfa.matches("a"))
+        self.assertTrue(nfa.matches("aaaaa"))
+        self.assertFalse(nfa.matches("baaaa"))
+        self.assertFalse(nfa.matches("aaaab"))
