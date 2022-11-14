@@ -14,6 +14,8 @@ import dataclasses
 import re
 import typing
 
+from .automata import Automaton
+
 
 @dataclasses.dataclass
 class Node:
@@ -28,6 +30,9 @@ class Node:
         self.name = name
         self.callers = set()
         self.callees = dict()
+
+    def __hash__(self) -> int:
+        return id(self)
 
     def __getitem__(self, callee: str) -> str:
         return self.callees[callee]
@@ -198,16 +203,19 @@ class Graph:
             return False
         return self._filter_node(n, external_ok)
 
-    def filter_edge(self, caller: str, callee: str, ref_ok: bool) -> bool:
-        caller_node = self._get_node(caller)
-        callee_node = self._get_node(callee)
-        if not caller_node or not callee_node:
-            return False
+    def _filter_edge(self, caller_node: Node, callee_node: Node, ref_ok: bool) -> bool:
         if caller_node.name in self.omitting_callees:
             return False
         if callee_node.name in self.omitting_callers:
             return False
         return caller_node[callee_node.name] == "call" or (ref_ok and not callee_node.external)
+
+    def filter_edge(self, caller: str, callee: str, ref_ok: bool) -> bool:
+        caller_node = self._get_node(caller)
+        callee_node = self._get_node(callee)
+        if not caller_node or not callee_node:
+            return False
+        return self._filter_edge(caller_node, callee_node, ref_ok)
 
     def omit_node(self, name: str) -> None:
         n = self._get_node(name)
@@ -274,6 +282,42 @@ class Graph:
 
     def reset_labels(self) -> None:
         self.node_labels = defaultdict(lambda: set())
+
+    def paths(self, a: Automaton[typing.Any], external_ok: bool,
+              ref_ok: bool) -> typing.Iterable[typing.Iterable[str]]:
+        visited: set[Node] = set()
+        valid: set[Node] = set()
+        path = list()
+
+        def visit(caller: typing.Optional[Node], nodes: typing.Iterable[str],
+                  state: typing.Any) -> typing.Iterable[typing.Iterable[str]]:
+            for target in nodes:
+                node = self._get_node(target)
+                assert node is not None
+                if node in visited:
+                    continue
+                if caller and not self._filter_edge(caller, node, ref_ok):
+                    continue
+
+                visited.add(node)
+                if node not in valid:
+                    if not self._filter_node(node, external_ok):
+                        # do not remove to prune quickly on subsequent paths.
+                        # this makes failure of this test rare, so do it last
+                        continue
+                    valid.add(node)
+
+                name = node.username or node.name
+                next_state = a.advance(state, name)
+                if not a.is_failure(next_state):
+                    path.append(name)
+                    if a.is_final(next_state):
+                        yield path
+                    yield from visit(node, node.callees.keys(), next_state)
+                    path.pop()
+                visited.remove(node)
+
+        yield from visit(None, self.nodes.keys(), a.initial())
 
     def reset_filter(self) -> None:
         self.omitted = set()

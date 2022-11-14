@@ -1,4 +1,5 @@
 import unittest
+from vrc.automata import regex
 from vrc.graph import Graph
 
 
@@ -273,3 +274,161 @@ class VRCGraphTest(unittest.TestCase):
         self.assertFalse(graph.has_label("a", "L1"))
         self.assertFalse(graph.has_label("b", "L2"))
         self.assertEqual(sorted(graph.labels()), [])
+
+
+class PathsTest(unittest.TestCase):
+    @staticmethod
+    def graph_for_paths() -> Graph:
+        graph = Graph()
+        graph.add_node("a")
+        graph.add_node("b")
+        graph.add_node("c")
+        graph.add_external_node("d")
+        graph.add_edge("a", "b", "ref")
+        graph.add_edge("b", "c", "call")
+        graph.add_edge("c", "d", "call")
+        graph.add_edge("a", "d", "call")
+        graph.add_label("a", "L1")
+        graph.add_label("c", "L1")
+        return graph
+
+    @staticmethod
+    def get_all_paths(graph: Graph, ast: regex.RegexAST,
+                      external_ok: bool = True, ref_ok: bool = True) -> list[list[str]]:
+        return [list(path) for path in graph.paths(ast.nfa().lazy_dfa(), external_ok, ref_ok)]
+
+    def test_sample_graph(self) -> None:
+        graph = self.graph_for_paths()
+        self.assertTrue(graph.has_label("a", "L1"))
+        self.assertTrue(not graph.has_label("b", "L1"))
+        self.assertTrue(graph.has_label("c", "L1"))
+        self.assertTrue(not graph.has_label("d", "L1"))
+
+    def test_path_one_node(self) -> None:
+        """Test a simple one-node path."""
+        graph = self.graph_for_paths()
+        ast = regex.One("a".__eq__)
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a"]])
+
+    def test_path_two_nodes(self) -> None:
+        """Test a simple two-node path."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.One("b".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a", "b"]])
+
+    def test_path_star(self) -> None:
+        """Test a simple path with multiple-length solutions."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        result = sorted(result, key=lambda x: len(x))
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], ["a", "d"])
+        self.assertEqual(result[1], ["a", "b", "c", "d"])
+
+    def test_label(self) -> None:
+        """Test a simple path with one-node path with labels."""
+        graph = self.graph_for_paths()
+        ast = regex.One(lambda x: graph.has_label(x, "L1"))
+        result = self.get_all_paths(graph, ast)
+        result = sorted(result, key=lambda x: x[0])
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], ["a"])
+        self.assertEqual(result[1], ["c"])
+
+    def test_complex(self) -> None:
+        """Test a complex path with labels and stars."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One(lambda x: graph.has_label(x, "L1")),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a", "b", "c", "d"]])
+
+    def test_no_label(self) -> None:
+        """Test a path with stars on labels."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: not graph.has_label(x, "L1"))),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a", "d"]])
+
+    def test_no_ref(self) -> None:
+        """Test filtering out references."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One(lambda x: graph.has_label(x, "L1")),
+            regex.One(lambda x: not graph.has_label(x, "L1")),
+        )
+        result = self.get_all_paths(graph, ast, ref_ok=False)
+        result = sorted(result, key=lambda x: len(x))
+        result = sorted(result, key=lambda x: x[0])
+        self.assertEqual(len(result), 2)
+        # a->b is filtered out
+        self.assertEqual(result[0], ["a", "d"])
+        self.assertEqual(result[1], ["c", "d"])
+
+    def test_no_external(self) -> None:
+        """Test filtering out external nodes."""
+        graph = self.graph_for_paths()
+        ast = regex.Sequence(
+            regex.One(lambda x: graph.has_label(x, "L1")),
+            regex.One(lambda x: not graph.has_label(x, "L1")),
+        )
+        result = self.get_all_paths(graph, ast, external_ok=False)
+        result = sorted(result, key=lambda x: len(x))
+        # a->d, c->d are filtered out
+        self.assertEqual(result, [["a", "b"]])
+
+    def test_omit_callees(self) -> None:
+        """Test filtering of edges."""
+        graph = self.graph_for_paths()
+        graph.omit_callees("b")
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a", "d"]])
+
+    def test_omit_node(self) -> None:
+        """Test filtering of nodes."""
+        graph = self.graph_for_paths()
+        graph.omit_node("b")
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(result, [["a", "d"]])
+
+    def test_only(self) -> None:
+        """Test filter_default = False."""
+        graph = self.graph_for_paths()
+        ast = regex.One(lambda x: graph.has_label(x, "L1"))
+        graph.filter_default = False
+        graph.keep_node("a")
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(len(result), 1)
+
+        graph.keep_node("c")
+        result = self.get_all_paths(graph, ast)
+        self.assertEqual(len(result), 2)
