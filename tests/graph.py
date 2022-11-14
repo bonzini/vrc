@@ -1,6 +1,7 @@
 import unittest
 from vrc.automata import regex
 from vrc.graph import Graph
+from vrc.util import Path
 
 
 class VRCGraphTest(unittest.TestCase):
@@ -276,7 +277,40 @@ class VRCGraphTest(unittest.TestCase):
         self.assertEqual(sorted(graph.labels()), [])
 
 
-class PathsTest(unittest.TestCase):
+class PathTest(unittest.TestCase):
+    def test_path(self) -> None:
+        p = Path()
+        self.assertEqual(list(p), [])
+
+        p.append("a")
+        self.assertEqual(list(p), ["a"])
+
+        p.append("b")
+        self.assertEqual(list(p), ["b", "a"])
+
+        p.pop()
+        self.assertEqual(list(p), ["a"])
+
+        p.append("b")
+        p.append("c")
+        save_p = iter(p)
+        p.pop()
+        self.assertEqual(list(p), ["b", "a"])
+        p.append("d")
+        self.assertEqual(list(save_p), ["c", "b", "a"])
+        self.assertEqual(list(p), ["d", "b", "a"])
+        p.pop()
+        p.pop()
+        self.assertEqual(list(p), ["a"])
+        p.pop()
+        self.assertEqual(list(p), [])
+
+        p.append("b")
+        p.append("c")
+        self.assertEqual(list(p), ["c", "b"])
+        p.pop()
+        p.pop()
+
     @staticmethod
     def graph_for_paths() -> Graph:
         graph = Graph()
@@ -319,7 +353,7 @@ class PathsTest(unittest.TestCase):
             regex.One("b".__eq__)
         )
         result = self.get_all_paths(graph, ast)
-        self.assertEqual(result, [["a", "b"]])
+        self.assertEqual(result, [["b", "a"]])
 
     def test_path_star(self) -> None:
         """Test a simple path with multiple-length solutions."""
@@ -332,8 +366,8 @@ class PathsTest(unittest.TestCase):
         result = self.get_all_paths(graph, ast)
         result = sorted(result, key=lambda x: len(x))
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0], ["a", "d"])
-        self.assertEqual(result[1], ["a", "b", "c", "d"])
+        self.assertEqual(result[0], ["d", "a"])
+        self.assertEqual(result[1], ["d", "c", "b", "a"])
 
     def test_label(self) -> None:
         """Test a simple path with one-node path with labels."""
@@ -356,7 +390,7 @@ class PathsTest(unittest.TestCase):
             regex.One("d".__eq__)
         )
         result = self.get_all_paths(graph, ast)
-        self.assertEqual(result, [["a", "b", "c", "d"]])
+        self.assertEqual(result, [["d", "c", "b", "a"]])
 
     def test_no_label(self) -> None:
         """Test a path with stars on labels."""
@@ -367,7 +401,7 @@ class PathsTest(unittest.TestCase):
             regex.One("d".__eq__)
         )
         result = self.get_all_paths(graph, ast)
-        self.assertEqual(result, [["a", "d"]])
+        self.assertEqual(result, [["d", "a"]])
 
     def test_no_ref(self) -> None:
         """Test filtering out references."""
@@ -378,11 +412,11 @@ class PathsTest(unittest.TestCase):
         )
         result = self.get_all_paths(graph, ast, ref_ok=False)
         result = sorted(result, key=lambda x: len(x))
-        result = sorted(result, key=lambda x: x[0])
+        result = sorted(result, key=lambda x: x[-1])
         self.assertEqual(len(result), 2)
         # a->b is filtered out
-        self.assertEqual(result[0], ["a", "d"])
-        self.assertEqual(result[1], ["c", "d"])
+        self.assertEqual(result[0], ["d", "a"])
+        self.assertEqual(result[1], ["d", "c"])
 
     def test_no_external(self) -> None:
         """Test filtering out external nodes."""
@@ -394,7 +428,7 @@ class PathsTest(unittest.TestCase):
         result = self.get_all_paths(graph, ast, external_ok=False)
         result = sorted(result, key=lambda x: len(x))
         # a->d, c->d are filtered out
-        self.assertEqual(result, [["a", "b"]])
+        self.assertEqual(result, [["b", "a"]])
 
     def test_omit_callees(self) -> None:
         """Test filtering of edges."""
@@ -406,7 +440,7 @@ class PathsTest(unittest.TestCase):
             regex.One("d".__eq__)
         )
         result = self.get_all_paths(graph, ast)
-        self.assertEqual(result, [["a", "d"]])
+        self.assertEqual(result, [["d", "a"]])
 
     def test_omit_node(self) -> None:
         """Test filtering of nodes."""
@@ -418,7 +452,7 @@ class PathsTest(unittest.TestCase):
             regex.One("d".__eq__)
         )
         result = self.get_all_paths(graph, ast)
-        self.assertEqual(result, [["a", "d"]])
+        self.assertEqual(result, [["d", "a"]])
 
     def test_only(self) -> None:
         """Test filter_default = False."""

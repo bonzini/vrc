@@ -14,6 +14,7 @@ import dataclasses
 import re
 import typing
 
+from .util import Path
 from .automata import Automaton
 
 
@@ -287,7 +288,7 @@ class Graph:
               ref_ok: bool) -> typing.Iterable[typing.Iterable[str]]:
         visited: set[Node] = set()
         valid: set[Node] = set()
-        path = list()
+        path = Path()
 
         def visit(caller: typing.Optional[Node], nodes: typing.Iterable[str],
                   state: typing.Any) -> typing.Iterable[typing.Iterable[str]]:

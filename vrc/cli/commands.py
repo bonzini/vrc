@@ -662,4 +662,4 @@ class PathsCommand(VRCCommand):
 
         dfa = result.value.nfa().lazy_dfa()
         for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
-            print(" -> ".join(path))
+            print(" <- ".join(path))
