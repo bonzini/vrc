@@ -9,14 +9,15 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-from abc import ABCMeta
 from .nfa import NFA, Matcher
+import abc
 import dataclasses
 import typing
 
 
 @dataclasses.dataclass
-class RegexAST(metaclass=ABCMeta):
+class RegexAST(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
     def tack(self, nfa: NFA, initial: int) -> int:
         """Make the ``initial`` state of the NFA accept the
            regex corresponding to ``self``.  Return the
