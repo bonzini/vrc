@@ -661,5 +661,9 @@ class PathsCommand(VRCCommand):
             return
 
         dfa = result.value.nfa().lazy_dfa()
-        for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
-            print(" <- ".join(path))
+        try:
+            for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
+                print(" <- ".join(path))
+        except KeyboardInterrupt:
+            print("Interrupt", file=sys.stderr)
+            return
