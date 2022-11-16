@@ -613,7 +613,7 @@ def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.
     Space = One.where(str.isspace)
     Spaces = Space.repeat(lower=0, reducer=lambda x, y: None)
 
-    WordChar = One.where(lambda c: c.isalnum() or c == '_')
+    WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
     Word = WordChar.repeat(lower=1)
 
     Label = Terminal('[').then(Word).skip(Terminal(']')).value(
@@ -628,7 +628,7 @@ def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.
     Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
     Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
 
-    Element = (Star | Any).skip(Spaces)
+    Element = (Any | Star).skip(Spaces)
     Sequence = Spaces.then(Element.repeat(lower=1, value=None, reducer=lambda x, y: y if not x else regex.Sequence(x, y)))
 
     Rest = (Terminal('|').then(Sequence)).repeat(value=None, reducer=lambda x, y: y if not x else regex.Alt(x, y))
