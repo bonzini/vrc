@@ -41,5 +41,5 @@ jobs:
     - name: Install in a virtual environment
       run: |
         python -m venv venv
-        . venv/bin/activate && pip install .
+        . venv/bin/activate && pip install . && vrc --help
 

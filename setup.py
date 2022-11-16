@@ -11,7 +11,10 @@ setup(
     long_description_content_type='text/markdown',
     author='Paolo Bonzini',
     author_email='bonzini@gnu.org',
-    packages=['vrc', 'vrc.cli'],
+    packages=['vrc', 'vrc.automata', 'vrc.cli'],
+    install_requires=[
+        'compynator'
+    ],
     entry_points={
         'console_scripts': [
             'vrc = vrc.cli.main:main',
