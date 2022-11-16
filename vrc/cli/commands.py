@@ -301,9 +301,9 @@ class EdgeCommand(VRCCommand):
 
     def run(self, args: argparse.Namespace) -> None:
         if not GRAPH.has_node(args.caller):
-            raise argparse.ArgumentError(None, "caller not found in graph")
+            raise argparse.ArgumentError(None, f"caller not found in graph: {args.caller}")
         if GRAPH.is_node_external(args.caller):
-            raise argparse.ArgumentError(None, "cannot add edge from external node")
+            raise argparse.ArgumentError(None, f"cannot add edge from external node: {args.caller}")
         GRAPH.add_edge(args.caller, args.callee, args.type)
 
 
