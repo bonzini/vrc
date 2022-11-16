@@ -219,6 +219,11 @@ class ReadlineInput:
 
 
 def main() -> None:
+    if '--help' in sys.argv:
+        print('vrc - Call graph querying tool')
+        print('Written by Paolo Bonzini')
+        sys.exit(0)
+
     if os.path.exists("compile_commands.json"):
         print("Loading compile_commands.json", file=sys.stderr)
         args = PARSER.parse_args(["compdb", "compile_commands.json"])
