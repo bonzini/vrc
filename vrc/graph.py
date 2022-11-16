@@ -127,9 +127,10 @@ class Graph:
         return bool(node and node.external)
 
     def edge_type(self, src: str, dest: str) -> str:
-        node = self._get_node(src)
-        assert node
-        return node[dest]
+        srcnode = self._get_node(src)
+        dstnode = self._get_node(dest)
+        assert srcnode and dstnode
+        return srcnode[dstnode.name]
 
     def _visit(self, start: str, targets: typing.Callable[[Node], typing.Iterable[str]]) -> typing.Iterator[str]:
         visited = set()
