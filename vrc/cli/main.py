@@ -50,19 +50,20 @@ class QuitCommand(VRCCommand):
 
 class SourceCommand(VRCCommand):
     """Processes the commands in a file."""
-    NAME = ("source",)
+    NAME = ("source", ".")
 
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("file", metavar="FILE")
+        parser.add_argument("file", metavar="FILE", nargs="+")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
         return FileCompleter()
 
     def run(self, args: argparse.Namespace) -> None:
-        with open(args.file, "r") as f:
-            self.do_source(f, exit_first=True)
+        for fn in args.file:
+            with open(fn, "r") as f:
+                self.do_source(f, exit_first=True)
 
     @staticmethod
     def do_source(inf: typing.Iterator[str], exit_first: bool) -> None:
