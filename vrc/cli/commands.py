@@ -14,6 +14,7 @@ from . import serialize_graph
 from ..automata import regex
 from ..graph import Graph
 from ..loaders import ResolutionError, TranslationUnit
+from ..loaders.clang import ClangLoader
 from ..loaders.rtl import RTLLoader
 from collections import defaultdict
 from contextlib import contextmanager
@@ -191,6 +192,7 @@ class LoadCommand(VRCCommand):
 
     LOADERS = {
         "rtl": RTLLoader,
+        "clang": ClangLoader,
     }
 
     @classmethod
