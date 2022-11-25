@@ -18,6 +18,7 @@ import compynator.core                        # type: ignore
 import glob
 import io
 import json
+import operator
 import os
 import re
 import readline
@@ -616,15 +617,19 @@ def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.
     WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
     Word = WordChar.repeat(lower=1)
 
-    Label = Terminal('[').then(Word).skip(Terminal(']')).value(
-        lambda x: regex.One(lambda y: y in GRAPH.labeled_nodes(x)))
-    NotLabel = Terminal('![').then(Word).skip(Terminal(']')).value(
-        lambda x: regex.One(lambda y: y not in GRAPH.labeled_nodes(x)))
+    Label = Spaces.then(Word).value(lambda x: [x])
+    MoreLabels = Spaces.then(Terminal(',')).then(Label).repeat(value=[], reducer=operator.add)
+    Labels = Label.then(MoreLabels, reducer=operator.add).skip(Spaces)
+
+    AllLabels = Terminal('[').then(Labels).skip(Terminal(']')).value(
+        lambda x: regex.One(lambda y: all((y in GRAPH.labeled_nodes(label) for label in x))))
+    NoLabels = Terminal('![').then(Labels).skip(Terminal(']')).value(
+        lambda x: regex.One(lambda y: all((y not in GRAPH.labeled_nodes(label) for label in x))))
     Node = Word.value(lambda x: regex.One(x.__eq__))
     Alt = Forward()
     Paren = Terminal('(').then(Alt).skip(Terminal(')'))
 
-    Atom = Label | NotLabel | Node | Paren
+    Atom = AllLabels | NoLabels | Node | Paren
     Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
     Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
 
