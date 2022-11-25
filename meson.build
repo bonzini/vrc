@@ -1,8 +1,9 @@
-project('vrc', [], version: files('VERSION'))
+project('vrc', ['c', 'cython'], version: files('VERSION'))
 
 fs = import('fs')
 py_mod = import('python')
 py = py_mod.find_installation()
+py_dep = py.dependency(required: false)
 
 srcfiles = [
   'vrc/__init__.py',
@@ -21,7 +22,14 @@ srcfiles = [
   'vrc/loaders/rtl.py',
 ]
 
+if py_dep.found()
+  srcfiles += [
+    'vrc/cython/__init__.py',
+  ]
+  subdir('vrc/cython')
+endif
+
 # use a loop to emulate preserve_path: true (added in 0.64)
 foreach file: srcfiles
-  py.install_sources(file, subdir: fs.parent(file))
+  py.install_sources(file, subdir: fs.parent(file), pure: false)
 endforeach
