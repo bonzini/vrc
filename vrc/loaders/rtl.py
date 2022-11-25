@@ -4,15 +4,15 @@ import shlex
 import subprocess
 import typing
 
-from . import Loader, ResolutionError
+from . import Loader, ResolutionError, TranslationUnit
 
 
 class RTLLoader(Loader):
     def resolve(self, fn: str) -> str:
-        def build_gcc_S_command_line(args: typing.Sequence[str], outfile: str) -> list[str]:
+        def build_gcc_S_command_line(tu: TranslationUnit, outfile: str) -> list[str]:
             out = []
             was_o = False
-            for i in args:
+            for i in tu.build_command:
                 if was_o:
                     i = '/dev/null'
                     was_o = False
@@ -26,10 +26,10 @@ class RTLLoader(Loader):
         if not fn.endswith(".o"):
             return fn
 
-        cmdline = self._get_compiler_cmdline(fn)
+        tu = self._get_translation_unit(fn)
         dumps = glob.glob(fn + ".*r.expand")
         if not dumps:
-            cmdline = build_gcc_S_command_line(cmdline, fn)
+            cmdline = build_gcc_S_command_line(tu, fn)
             self.verbose_print(f"Launching {shlex.join(cmdline)}")
             try:
                 result = subprocess.run(cmdline,
