@@ -35,6 +35,7 @@ class Loader(metaclass=abc.ABCMeta):
     target: Graph
     verbose_print: typing.Callable[[str], None]
     compdb: typing.Mapping[str, TranslationUnit]
+    force: bool = False
 
     def load(self, fn: str, ) -> None:
         resolved_fn = self.resolve(fn)

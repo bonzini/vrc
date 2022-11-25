@@ -197,6 +197,8 @@ class LoadCommand(VRCCommand):
         parser.add_argument("--verbose", action="store_const",
                             const=VRCCommand.print_stderr, default=VRCCommand.eat,
                             help="Report progress while parsing")
+        parser.add_argument("--force", action="store_true",
+                            help="Do not use cached result")
         parser.add_argument("--loader", default="rtl",
                             help="Pick how to analyze the translation unit")
         parser.add_argument("files", metavar="FILE", nargs="+",
@@ -217,7 +219,7 @@ class LoadCommand(VRCCommand):
                   + f"{', '.join(self.LOADERS.keys())})", file=sys.stderr)
             return
 
-        loader = loader_class(GRAPH, args.verbose, COMPDB)
+        loader = loader_class(GRAPH, args.verbose, COMPDB, args.force)
 
         cwd = os.getcwd()
         for pattern in args.files:
