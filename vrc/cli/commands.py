@@ -10,6 +10,7 @@
 # (at your option) any later version.
 
 import argparse
+from . import serialize_graph
 from ..automata import regex
 from ..graph import Graph
 from ..loaders import ResolutionError, TranslationUnit
@@ -479,32 +480,12 @@ class SaveCommand(VRCCommand):
         return FileCompleter() if nwords == 1 else Completer()
 
     def run(self, args: argparse.Namespace) -> None:
-        def emit(f: typing.TextIO) -> None:
-            node_to_file = dict()
-            for file in GRAPH.all_files():
-                for node in GRAPH.all_nodes_for_file(file):
-                    node_to_file[node] = file
-
-            for node in GRAPH.all_nodes(True):
-                if GRAPH.is_node_external(node):
-                    print("node", "--external", node, file=f)
-                else:
-                    print("node", node, node_to_file.get(node, ""), file=f)
-
-            for label in sorted(GRAPH.labels()):
-                for node in GRAPH.labeled_nodes(label):
-                    print("label", label, node, file=f)
-
-            for node in GRAPH.all_nodes(False):
-                for target in GRAPH.callees(node, True, True):
-                    print("edge", node, target, GRAPH.edge_type(node, target), file=f)
-
         if args.file:
             fn = os.path.expanduser(args.file)
             with open_unlink_on_error(fn) as f:
-                emit(f)
+                serialize_graph(GRAPH, f)
         else:
-            emit(sys.stdout)
+            serialize_graph(GRAPH, sys.stdout)
 
 
 class OutputCommand(VRCCommand):
