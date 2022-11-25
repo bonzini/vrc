@@ -17,3 +17,10 @@ dependencies = [
 
 [project.scripts]
 vrc = "vrc.cli.main:main"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+python_files = "tests/*"
+
+[tool.mypy]
+strict = true
