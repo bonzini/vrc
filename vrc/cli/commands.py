@@ -12,7 +12,7 @@
 import argparse
 from ..automata import regex
 from ..graph import Graph
-from ..loaders import ResolutionError
+from ..loaders import ResolutionError, TranslationUnit
 from ..loaders.rtl import RTLLoader
 from collections import defaultdict
 from contextlib import contextmanager
@@ -24,7 +24,6 @@ import operator
 import os
 import re
 import readline
-import shlex
 import subprocess
 import sys
 import typing
@@ -101,6 +100,14 @@ class VRCCommand:
 
     NAME: typing.Optional[tuple[str, ...]] = None
 
+    @staticmethod
+    def eat(*args: list[typing.Any]) -> None:
+        pass
+
+    @staticmethod
+    def print_stderr(*args: list[typing.Any]) -> None:
+        print(*args, file=sys.stderr)
+
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
         """Setup argument parser"""
@@ -156,6 +163,9 @@ class CompdbCommand(VRCCommand):
 
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--verbose", action="store_const",
+                            const=VRCCommand.print_stderr, default=VRCCommand.eat,
+                            help="Report progress while parsing")
         parser.add_argument("file", metavar="FILE",
                             help="JSON file to be loaded")
 
@@ -166,11 +176,12 @@ class CompdbCommand(VRCCommand):
     def run(self, args: argparse.Namespace) -> None:
         with open(args.file, 'r') as f:
             for entry in json.load(f):
-                key = os.path.abspath(os.path.join(entry["directory"], entry["output"]))
-                COMPDB[key] = entry["command"]
+                tu = TranslationUnit.from_compile_commands_json(entry)
+                args.verbose(f"Added {tu.object_file}")
+                COMPDB[tu.object_file] = tu
 
 
-COMPDB: dict[str, str] = dict()
+COMPDB: dict[str, TranslationUnit] = dict()
 
 
 class LoadCommand(VRCCommand):
@@ -183,14 +194,8 @@ class LoadCommand(VRCCommand):
 
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
-        def eat(*args: list[typing.Any]) -> None:
-            pass
-
-        def print_stderr(*args: list[typing.Any]) -> None:
-            print(*args, file=sys.stderr)
-
         parser.add_argument("--verbose", action="store_const",
-                            const=print_stderr, default=eat,
+                            const=VRCCommand.print_stderr, default=VRCCommand.eat,
                             help="Report progress while parsing")
         parser.add_argument("--loader", default="rtl",
                             help="Pick how to analyze the translation unit")
@@ -212,8 +217,7 @@ class LoadCommand(VRCCommand):
                   + f"{', '.join(self.LOADERS.keys())})", file=sys.stderr)
             return
 
-        loader = loader_class(GRAPH, args.verbose,
-                              lambda x: shlex.split(COMPDB[x]))
+        loader = loader_class(GRAPH, args.verbose, COMPDB)
 
         cwd = os.getcwd()
         for pattern in args.files:

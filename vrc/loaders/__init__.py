@@ -1,9 +1,27 @@
 import abc
 import dataclasses
+import os
+import shlex
 import sys
 import typing
 
 from vrc.graph import Graph
+
+
+@dataclasses.dataclass
+class TranslationUnit:
+    absolute_path: str
+    build_working_dir: str
+    build_command: typing.Sequence[str]
+    object_file: str
+
+    @classmethod
+    def from_compile_commands_json(cls, cmd: dict[str, str]) -> 'TranslationUnit':
+        return cls(
+            absolute_path=os.path.abspath(os.path.join(cmd["directory"], cmd["file"])),
+            build_working_dir=cmd["directory"],
+            build_command=shlex.split(cmd["command"]),
+            object_file=os.path.abspath(os.path.join(cmd["directory"], cmd["output"])))
 
 
 class ResolutionError(Exception):
@@ -16,7 +34,7 @@ class ResolutionError(Exception):
 class Loader(metaclass=abc.ABCMeta):
     target: Graph
     verbose_print: typing.Callable[[str], None]
-    compiler_cmd: typing.Callable[[str], typing.Sequence[str]]
+    compdb: typing.Mapping[str, TranslationUnit]
 
     def load(self, fn: str, ) -> None:
         resolved_fn = self.resolve(fn)
@@ -27,9 +45,9 @@ class Loader(metaclass=abc.ABCMeta):
 
         self.parse(resolved_fn)
 
-    def _get_compiler_cmdline(self, fn: str) -> typing.Sequence[str]:
+    def _get_translation_unit(self, fn: str) -> TranslationUnit:
         try:
-            return self.compiler_cmd(fn)
+            return self.compdb[fn]
         except KeyError:
             raise ResolutionError(f"Could not find '{fn}' in compile_commands.json")
 
