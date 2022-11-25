@@ -59,3 +59,8 @@ class Loader(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def resolve(self, fn: str) -> str:
         pass
+
+
+def get_loaders() -> typing.Mapping[str, typing.Type[Loader]]:
+    from .registry import LOADERS
+    return LOADERS
