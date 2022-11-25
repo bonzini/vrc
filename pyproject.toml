@@ -21,6 +21,9 @@ vrc = "vrc.cli.main:main"
 [tool.pytest.ini_options]
 minversion = "6.0"
 python_files = "tests/*"
+addopts = [
+    "--import-mode=importlib",
+]
 
 [tool.mypy]
 strict = true
