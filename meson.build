@@ -25,3 +25,8 @@ srcfiles = [
 foreach file: srcfiles
   py.install_sources(file, subdir: fs.parent(file))
 endforeach
+
+meson.add_postconf_script(find_program('scripts/build-site-packages.py'))
+testenv = { 'PYTHONPATH': meson.current_build_dir() / 'site-packages' }
+meson.add_devenv(testenv)
+subdir('tests')
