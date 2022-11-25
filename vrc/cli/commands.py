@@ -653,7 +653,7 @@ class PathsCommand(VRCCommand):
         s = " ".join(args.expr)
         results = PathsCommand.PARSER(s)
         if not isinstance(results, compynator.core.Success):
-            print(f"invalid search terms at 'f{s}'", file=sys.stderr)
+            print(f"invalid search terms at '{s}'", file=sys.stderr)
             return
         result = next(iter(results))
         if result.remain:
