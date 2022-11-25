@@ -1,10 +1,52 @@
+import glob
 import re
+import shlex
+import subprocess
 import typing
 
-from . import Loader
+from . import Loader, ResolutionError
 
 
 class RTLLoader(Loader):
+    def resolve(self, fn: str) -> str:
+        def build_gcc_S_command_line(args: typing.Sequence[str], outfile: str) -> list[str]:
+            out = []
+            was_o = False
+            for i in args:
+                if was_o:
+                    i = '/dev/null'
+                    was_o = False
+                elif i == '-c':
+                    i = '-S'
+                elif i == '-o':
+                    was_o = True
+                out.append(i)
+            return out + ['-fdump-rtl-expand', '-dumpbase', outfile]
+
+        if not fn.endswith(".o"):
+            return fn
+
+        cmdline = self._get_compiler_cmdline(fn)
+        dumps = glob.glob(fn + ".*r.expand")
+        if not dumps:
+            cmdline = build_gcc_S_command_line(cmdline, fn)
+            self.verbose_print(f"Launching {shlex.join(cmdline)}")
+            try:
+                result = subprocess.run(cmdline,
+                                        stdin=subprocess.DEVNULL)
+            except KeyboardInterrupt:
+                raise ResolutionError("Interrupt")
+            if result.returncode != 0:
+                raise ResolutionError(f"Compiler exited with return code {result.returncode}")
+            dumps = glob.glob(fn + ".*r.expand")
+            if not dumps:
+                raise ResolutionError("Compiler did not produce dump file")
+
+        if len(dumps) > 1:
+            raise ResolutionError(f"Found more than one dump file: {', '.join(dumps)}")
+
+        return dumps[0]
+
     def parse_lines(self, fn: str, lines: typing.Iterator[str]) -> None:
         RE_FUNC1 = re.compile(r"^;; Function (\S+)\s*$")
         RE_FUNC2 = re.compile(r"^;; Function (.*)\s+\((\S+)(,.*)?\).*$")
