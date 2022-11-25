@@ -12,6 +12,7 @@
 import argparse
 from ..automata import regex
 from ..graph import Graph
+from ..loaders import ResolutionError
 from ..loaders.rtl import RTLLoader
 from collections import defaultdict
 from contextlib import contextmanager
@@ -195,22 +196,8 @@ class LoadCommand(VRCCommand):
         return FileCompleter(["*.o", "*r.expand"])
 
     def run(self, args: argparse.Namespace) -> None:
-        parser = RTLLoader(GRAPH, args.verbose)
-
-        def build_gcc_S_command_line(cmd: str, outfile: str) -> list[str]:
-            args = shlex.split(cmd)
-            out = []
-            was_o = False
-            for i in args:
-                if was_o:
-                    i = '/dev/null'
-                    was_o = False
-                elif i == '-c':
-                    i = '-S'
-                elif i == '-o':
-                    was_o = True
-                out.append(i)
-            return out + ['-fdump-rtl-expand', '-dumpbase', outfile]
+        loader = RTLLoader(GRAPH, args.verbose,
+                           lambda x: shlex.split(COMPDB[x]))
 
         def expand_glob(s: str) -> list[str]:
             return glob.glob(s) or [s]
@@ -219,38 +206,10 @@ class LoadCommand(VRCCommand):
             cwd = os.getcwd()
             for pattern in files:
                 for fn in expand_glob(os.path.join(cwd, os.path.expanduser(pattern))):
-                    if fn.endswith(".o"):
-                        if fn not in COMPDB:
-                            print(f"Could not find '{fn}' in compile_commands.json", file=sys.stderr)
-                            continue
-
-                        dumps = glob.glob(fn + ".*r.expand")
-                        if not dumps:
-                            cmdline = build_gcc_S_command_line(COMPDB[fn], fn)
-                            args.verbose(f"Launching {shlex.join(cmdline)}")
-                            try:
-                                result = subprocess.run(cmdline,
-                                                        stdin=subprocess.DEVNULL)
-                            except KeyboardInterrupt:
-                                print("Interrupt", file=sys.stderr)
-                                break
-                            if result.returncode != 0:
-                                print(f"Compiler exited with return code {result.returncode}", file=sys.stderr)
-                                continue
-                            dumps = glob.glob(fn + ".*r.expand")
-                            if not dumps:
-                                print("Compiler did not produce dump file", file=sys.stderr)
-                                continue
-
-                        if len(dumps) > 1:
-                            print(f"Found more than one dump file: {', '.join(dumps)}", file=sys.stderr)
-                            continue
-
-                        print(f"Reading {os.path.relpath(dumps[0])}", file=sys.stderr)
-                        parser.parse(dumps[0])
-                    else:
-                        args.verbose(f"Reading {os.path.relpath(fn)}")
-                        parser.parse(fn)
+                    try:
+                        loader.load(fn)
+                    except ResolutionError as e:
+                        print(e.message, file=sys.stderr)
 
         resolve(args.files)
 
