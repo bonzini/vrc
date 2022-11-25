@@ -1,0 +1,2 @@
+option('pytest_tap', type: 'boolean', value: false,
+       description: 'whether to use pytest-tap for TAP reporting')
