@@ -28,7 +28,7 @@ class RTLLoader(Loader):
 
         tu = self._get_translation_unit(fn)
         dumps = glob.glob(fn + ".*r.expand")
-        if not dumps:
+        if not dumps or self.force:
             cmdline = build_gcc_S_command_line(tu, fn)
             self.verbose_print(f"Launching {shlex.join(cmdline)}")
             try:
