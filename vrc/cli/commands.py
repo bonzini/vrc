@@ -10,8 +10,9 @@
 # (at your option) any later version.
 
 import argparse
-from .. import graph
 from ..automata import regex
+from ..graph import Graph
+from ..loaders.rtl import RTLLoader
 from collections import defaultdict
 from contextlib import contextmanager
 import compynator.core                        # type: ignore
@@ -28,7 +29,7 @@ import sys
 import typing
 
 
-GRAPH = graph.Graph()
+GRAPH = Graph()
 
 
 @contextmanager
@@ -194,6 +195,8 @@ class LoadCommand(VRCCommand):
         return FileCompleter(["*.o", "*r.expand"])
 
     def run(self, args: argparse.Namespace) -> None:
+        parser = RTLLoader(GRAPH, args.verbose)
+
         def build_gcc_S_command_line(cmd: str, outfile: str) -> list[str]:
             args = shlex.split(cmd)
             out = []
@@ -211,10 +214,6 @@ class LoadCommand(VRCCommand):
 
         def expand_glob(s: str) -> list[str]:
             return glob.glob(s) or [s]
-
-        def parse_rtl(fn: str) -> None:
-            with open(fn, "r") as f:
-                GRAPH.parse(fn, f, verbose_print=args.verbose)
 
         def resolve(files: typing.Iterator[str]) -> None:
             cwd = os.getcwd()
@@ -248,10 +247,10 @@ class LoadCommand(VRCCommand):
                             continue
 
                         print(f"Reading {os.path.relpath(dumps[0])}", file=sys.stderr)
-                        parse_rtl(dumps[0])
+                        parser.parse(dumps[0])
                     else:
                         args.verbose(f"Reading {os.path.relpath(fn)}")
-                        parse_rtl(fn)
+                        parser.parse(fn)
 
         resolve(args.files)
 
