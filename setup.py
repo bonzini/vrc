@@ -11,7 +11,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Paolo Bonzini',
     author_email='bonzini@gnu.org',
-    packages=['vrc', 'vrc.automata', 'vrc.cli'],
+    packages=['vrc', 'vrc.automata', 'vrc.cli', 'vrc.loaders'],
     install_requires=[
         'compynator'
     ],

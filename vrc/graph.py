@@ -11,7 +11,6 @@
 
 from collections import defaultdict
 import dataclasses
-import re
 import typing
 
 from .util import Path
@@ -62,32 +61,6 @@ class Graph:
 
         self.reset_filter()
         self.reset_labels()
-
-    def parse(self, fn: str, lines: typing.Iterator[str], verbose_print: typing.Callable[[str], None]) -> None:
-        RE_FUNC1 = re.compile(r"^;; Function (\S+)\s*$")
-        RE_FUNC2 = re.compile(r"^;; Function (.*)\s+\((\S+)(,.*)?\).*$")
-        RE_SYMBOL_REF = re.compile(r'\(symbol_ref [^(]* \( "([^"]*)"', flags=re.X)
-        curfunc = None
-        for line in lines:
-            if line.startswith(";; Function "):
-                m = RE_FUNC1.search(line)
-                if m:
-                    curfunc = m.group(1)
-                    self.add_node(m.group(1), file=fn)
-                    verbose_print(f"{fn}: found function {m.group(1)}")
-                    continue
-                m = RE_FUNC2.search(line)
-                if m:
-                    curfunc = m.group(2)
-                    self.add_node(m.group(2), username=m.group(1), file=fn)
-                    verbose_print(f"{fn}: found function {m.group(1)} ({m.group(2)})")
-                    continue
-            elif curfunc:
-                m = RE_SYMBOL_REF.search(line)
-                if m:
-                    type = "call" if "(call" in line else "ref"
-                    verbose_print(f"{fn}: found {type} edge {curfunc} -> {m.group(1)}")
-                    self.add_edge(curfunc, m.group(1), type)
 
     def add_external_node(self, name: str) -> None:
         if name not in self.nodes:
