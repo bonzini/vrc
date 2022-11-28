@@ -1,5 +1,5 @@
 [build-system]
-requires = ["meson-python"]
+requires = ["meson-python", "cython"]
 build-backend = "mesonpy"
 
 [project]
@@ -27,3 +27,6 @@ addopts = [
 
 [tool.mypy]
 strict = true
+
+[tool.mypy-tests.cython]
+ignore_missing_imports = true

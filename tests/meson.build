@@ -4,6 +4,10 @@ tests = [
   'nfa.py',
 ]
 
+if py_dep.found()
+  tests += ['cython.py']
+endif
+
 pyfiles = srcfiles
 foreach t: tests
   run_command('ln', '-sf', files(t), meson.current_build_dir(), check: true)
