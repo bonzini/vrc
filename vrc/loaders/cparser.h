@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-void build_graph(const char *const *args, int num_args,
+void build_graph(const char *filename, const char *const *args, int num_args,
 		 const char *out_path, bool verbose, char **diagnostic);
 
 #ifdef __cplusplus

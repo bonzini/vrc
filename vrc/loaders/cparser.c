@@ -6,6 +6,7 @@
 #include <clang-c/Index.h>
 
 typedef struct VisitorState {
+    const char *filename;
     FILE *outf;
     bool verbose;
     CXString current_function;
@@ -15,7 +16,9 @@ typedef enum CXChildVisitResult VisitorFunc(CXCursor cursor, CXCursor parent, Vi
 
 #define verbose_print(s, fmt, ...) do {                                     \
     if ((s)->verbose) {                                                     \
-        fprintf(stderr, "%s: " fmt "\n",                                    \
+        fprintf(stderr, "%s%s%s: " fmt "\n",                                \
+		(s)->filename,                                              \
+                (s)->filename ? ": " : "",                                  \
                 clang_getCString((s)->current_function), ## __VA_ARGS__);   \
     }                                                                       \
 } while (0)
@@ -140,8 +143,8 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
     return result;
 }
 
-void build_graph(const char *const *args, int num_args, const char *out_path,
-                 bool verbose, char **diagnostic)
+void build_graph(const char *filename, const char *const *args, int num_args,
+		 const char *out_path, bool verbose, char **diagnostic)
 {
     int i;
 

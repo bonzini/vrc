@@ -25,13 +25,18 @@ cdef char **to_cstring_array(list list_str) except NULL:
     return ret
 
 
-cpdef int build_graph(list args, str out_path, bint verbose) except -1:
+cpdef int build_graph(str filename, list args, str out_path, bint verbose) except -1:
+    if not out_path:
+        raise TypeError("expected str")
+
     cdef char *diagnostic = NULL
+    cdef char *c_filename = PyUnicode_AsUTF8(filename) if filename else NULL
     cdef char **c_args = to_cstring_array(args)
     cdef int n_args = len(args)
-    cdef char *c_out_path = PyUnicode_AsUTF8(out_path);
+    cdef char *c_out_path = PyUnicode_AsUTF8(out_path)
     with nogil:
-        cparser.build_graph(c_args, n_args, c_out_path, verbose, &diagnostic)
+        cparser.build_graph(c_filename, c_args, n_args,
+                            c_out_path, verbose, &diagnostic)
     free(c_args)
     if diagnostic:
         try:
@@ -44,6 +49,6 @@ class LibclangLoader(ClangLoader):
         ntasks = (os.cpu_count() or 2) - 1
         return conc.ThreadPoolExecutor(max_workers=ntasks)
 
-    def save_graph(self, fn, args, out_path):
-        build_graph(args, out_path,
+    def save_graph(self, filename, args, out_path):
+        build_graph(filename, args, out_path,
                     self.verbose_print is VRCCommand.print_stderr)
