@@ -43,6 +43,13 @@ class NFATest(unittest.TestCase):
         v.visit("A")
         self.assertFalse(v.success())
 
+    def test_empty(self) -> None:
+        a = NFA()
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
+        self.assertFalse(v.success())
+
     def test_nfa(self) -> None:
         nfa = self.sample_nfa()
         self.sample_visit(nfa)
@@ -59,9 +66,23 @@ class NFATest(unittest.TestCase):
         dfa = self.sample_nfa().lazy_dfa()
         self.sample_visit(dfa)
 
+    def test_empty_lazy_dfa(self) -> None:
+        a = NFA().lazy_dfa()
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
+        self.assertFalse(v.success())
+
     def test_nfa_to_dfa(self) -> None:
         dfa = self.sample_nfa().dfa(["A", "B", "X", "Y"])
         self.sample_visit(dfa)
+
+    def test_empty_nfa_to_dfa(self) -> None:
+        a = NFA().dfa(["x"])
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
+        self.assertFalse(v.success())
 
 
 class RegexTest(unittest.TestCase):

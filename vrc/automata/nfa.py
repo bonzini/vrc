@@ -140,7 +140,7 @@ class NFA(Automaton[StateSet]):
 
     def initial(self) -> StateSet:
         """Return the initial state of a visit on the NFA."""
-        return self.epsilon_closure(0)
+        return self.epsilon_closure(0) if self.transition else set()
 
     def advance(self, source: StateSet, symbol: str) -> StateSet:
         """Return the states reached by the NFA when fed the given symbol
@@ -169,6 +169,9 @@ class NFA(Automaton[StateSet]):
         """Return a DFA that is equivalent to ``self``."""
 
         dfa = DFA()
+        if not self.transition:
+            return dfa
+
         initial = frozenset(self.epsilon_closure(0))
         statemap: dict[frozenset[int], int] = dict()
         statemap[initial] = dfa.add_state()
