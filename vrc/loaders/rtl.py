@@ -11,7 +11,8 @@ from . import Loader, ResolutionError, TranslationUnit
 
 class RTLLoader(Loader):
     def get_executor(self) -> conc.Executor:
-        ntasks = (os.cpu_count() or 2) - 1
+        ncpus = os.cpu_count() or 1
+        ntasks = max(2, ncpus) - 1
         return conc.ThreadPoolExecutor(max_workers=ntasks)
 
     def resolve(self, fn: str) -> str:

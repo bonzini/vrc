@@ -46,7 +46,8 @@ cpdef int build_graph(str filename, list args, str out_path, bint verbose) excep
 
 class LibclangLoader(ClangLoader):
     def get_executor(self):
-        ntasks = (os.cpu_count() or 2) - 1
+        ncpus = os.cpu_count() or 1
+        ntasks = max(2, ncpus) - 1
         return conc.ThreadPoolExecutor(max_workers=ntasks)
 
     def save_graph(self, filename, args, out_path):
