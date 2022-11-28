@@ -1,9 +1,6 @@
 # Authors: Paolo Bonzini <pbonzini@redhat.com>, Alberto Faria <afaria@redhat.com>
 
 import clang.cindex            # type: ignore
-import os
-import re
-import subprocess
 import typing
 
 from ctypes import CFUNCTYPE, c_int, py_object
@@ -14,8 +11,8 @@ from clang.cindex import (
 )
 from enum import Enum
 
-from . import Loader, ResolutionError, TranslationUnit
-from ..cli import serialize_graph, source
+from . import ClangLoader, ResolutionError
+from ..cli import serialize_graph
 from ..graph import Graph
 
 
@@ -88,123 +85,65 @@ def visit(root: Cursor, visitor: typing.Callable[[Cursor], VisitorResult]) -> bo
     return result == 0
 
 
-class ClangLoader(Loader):
-    @staticmethod
-    def get_clang_system_include_paths() -> typing.Sequence[str]:
-        # libclang does not automatically include clang's standard system include
-        # paths, so we ask clang what they are and include them ourselves.
-        result = subprocess.run(
-            ["clang", "-E", "-", "-v"],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,  # decode output using default encoding
-            check=True,
-        )
+class ClangCIndexLoader(ClangLoader):
+    def build_graph(self, fn: str, tu_cursor: Cursor) -> Graph:
+        file_graph = Graph()
+        current_function = ''
 
-        pattern = (
-            r"#include <...> search starts here:\n"
-            r"((?: \S*\n)+)"
-            r"End of search list."
-        )
+        def visit_function_decl(c: Cursor) -> VisitorResult:
+            k = c.kind
+            if k == CursorKind.ANNOTATE_ATTR:
+                self.verbose_print(f"{fn}: {current_function}: found annotation {c.spelling}")
+                file_graph.add_external_node(current_function)
+                file_graph.add_label(current_function, c.spelling)
 
-        match = re.search(pattern, result.stderr, re.MULTILINE)
-        assert match is not None
-        return [line[1:] for line in match.group(1).splitlines()]
+            return VisitorResult.RECURSE
 
-    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.system_include_paths = ClangLoader.get_clang_system_include_paths()
+        def visit_function_body(c: Cursor) -> VisitorResult:
+            k = c.kind
+            if k == CursorKind.CALL_EXPR and c.referenced is not None:
+                self.verbose_print(f"{fn}: {current_function}: found call to {c.referenced.spelling}")
+                file_graph.add_edge(current_function, c.referenced.spelling, type="call")
 
-    def resolve(self, fn: str) -> str:
-        def build_libclang_command_line(tu: TranslationUnit) -> list[str]:
-            command = tu.build_command
-            return [
-                # keep the original compilation command name
-                command[0],
-                # ignore unknown GCC warning options
-                "-Wno-unknown-warning-option",
-                # keep all other arguments but the last, which is the file name
-                *command[1:-1],
-                # add clang system include paths
-                *(
-                    arg
-                    for path in self.system_include_paths
-                    for arg in ("-isystem", path)
-                ),
-                # replace relative path to get absolute location information
-                tu.absolute_path,
-            ]
+            if k == CursorKind.FUNCTION_DECL:
+                self.verbose_print(f"{fn}: {current_function}: found reference to {c.referenced.spelling}")
+                file_graph.add_edge(current_function, c.referenced.spelling, type="ref")
 
-        def build_graph(tu_cursor: Cursor) -> Graph:
-            file_graph = Graph()
-            current_function = ''
+            elif k == CursorKind.ANNOTATE_ATTR:
+                self.verbose_print(f"{fn}: {current_function}: found annotation {c.spelling}")
+                file_graph.add_label(current_function, c.spelling)
 
-            def visit_function_decl(c: Cursor) -> VisitorResult:
-                k = c.kind
-                if k == CursorKind.ANNOTATE_ATTR:
-                    self.verbose_print(f"{fn}: {current_function}: found annotation {c.spelling}")
-                    file_graph.add_external_node(current_function)
-                    file_graph.add_label(current_function, c.spelling)
+            return VisitorResult.RECURSE
 
-                return VisitorResult.RECURSE
+        def visit_clang_tu(c: Cursor) -> VisitorResult:
+            k = c.kind
+            if k == CursorKind.FUNCTION_DECL:
+                nonlocal current_function
+                save_current_function = current_function
+                current_function = c.spelling
+                if c.is_definition():
+                    self.verbose_print(f"{fn}: found function definition {current_function}")
+                    file_graph.add_node(current_function)
+                    visit(c, visit_function_body)
+                else:
+                    self.verbose_print(f"{fn}: found function declaration {current_function}")
+                    visit(c, visit_function_decl)
+                current_function = save_current_function
+                return VisitorResult.CONTINUE
 
-            def visit_function_body(c: Cursor) -> VisitorResult:
-                k = c.kind
-                if k == CursorKind.CALL_EXPR and c.referenced is not None:
-                    self.verbose_print(f"{fn}: {current_function}: found call to {c.referenced.spelling}")
-                    file_graph.add_edge(current_function, c.referenced.spelling, type="call")
+            return VisitorResult.RECURSE
 
-                if k == CursorKind.FUNCTION_DECL:
-                    self.verbose_print(f"{fn}: {current_function}: found reference to {c.referenced.spelling}")
-                    file_graph.add_edge(current_function, c.referenced.spelling, type="ref")
+        visit(tu_cursor, visit_clang_tu)
+        return file_graph
 
-                elif k == CursorKind.ANNOTATE_ATTR:
-                    self.verbose_print(f"{fn}: {current_function}: found annotation {c.spelling}")
-                    file_graph.add_label(current_function, c.spelling)
+    def save_graph(self, fn: str, args: list[str], vrc_path: str) -> None:
+        try:
+            clang_tu = clang.cindex.TranslationUnit.from_source(
+                filename=None, args=args)
+        except clang.cindex.TranslationUnitLoadError as e:
+            raise ResolutionError(f"Failed to load {fn}") from e
 
-                return VisitorResult.RECURSE
-
-            def visit_clang_tu(c: Cursor) -> VisitorResult:
-                k = c.kind
-                if k == CursorKind.FUNCTION_DECL:
-                    nonlocal current_function
-                    save_current_function = current_function
-                    current_function = c.spelling
-                    if c.is_definition():
-                        self.verbose_print(f"{fn}: found function definition {current_function}")
-                        file_graph.add_node(current_function)
-                        visit(c, visit_function_body)
-                    else:
-                        self.verbose_print(f"{fn}: found function declaration {current_function}")
-                        visit(c, visit_function_decl)
-                    current_function = save_current_function
-                    return VisitorResult.CONTINUE
-
-                return VisitorResult.RECURSE
-
-            visit(tu_cursor, visit_clang_tu)
-            return file_graph
-
-        tu = self._get_translation_unit(fn)
-        vrc_path = fn + ".vrc"
-        if self.force or not os.path.exists(vrc_path):
-            try:
-                try:
-                    clang_tu = clang.cindex.TranslationUnit.from_source(
-                        filename=None, args=build_libclang_command_line(tu))
-                except clang.cindex.TranslationUnitLoadError as e:
-                    raise ResolutionError(f"Failed to load {fn}") from e
-                print(f"Parsing {tu.absolute_path}")
-                file_graph = build_graph(clang_tu.cursor)
-                self.verbose_print(f"Writing {vrc_path}")
-                with open(vrc_path, "w") as outf:
-                    serialize_graph(file_graph, outf)
-            except KeyboardInterrupt:
-                raise ResolutionError("Interrupt")
-
-        return vrc_path
-
-    def parse(self, fn: str) -> None:
-        with open(fn, "r") as f:
-            source(f, False)
+        file_graph = self.build_graph(fn, clang_tu.cursor)
+        self.verbose_print(f"Writing {vrc_path}")
+        with open(vrc_path, "w") as outf:
+            serialize_graph(file_graph, outf)

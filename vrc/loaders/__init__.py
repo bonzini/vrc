@@ -1,11 +1,14 @@
 import abc
 import dataclasses
 import os
+import re
 import shlex
+import subprocess
 import sys
 import typing
 
-from vrc.graph import Graph
+from ..cli import source
+from ..graph import Graph
 
 
 @dataclasses.dataclass
@@ -59,6 +62,72 @@ class Loader(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def resolve(self, fn: str) -> str:
         pass
+
+
+class ClangLoader(Loader, metaclass=abc.ABCMeta):
+    @staticmethod
+    def get_clang_system_include_paths() -> typing.Sequence[str]:
+        # libclang does not automatically include clang's standard system include
+        # paths, so we ask clang what they are and include them ourselves.
+        result = subprocess.run(
+            ["clang", "-E", "-", "-v"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,  # decode output using default encoding
+            check=True,
+        )
+
+        pattern = (
+            r"#include <...> search starts here:\n"
+            r"((?: \S*\n)+)"
+            r"End of search list."
+        )
+
+        match = re.search(pattern, result.stderr, re.MULTILINE)
+        assert match is not None
+        return [line[1:] for line in match.group(1).splitlines()]
+
+    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.system_include_paths = ClangLoader.get_clang_system_include_paths()
+
+    def resolve(self, fn: str) -> str:
+        def build_libclang_command_line(tu: TranslationUnit) -> list[str]:
+            command = tu.build_command
+            return [
+                # keep the original compilation command name
+                command[0],
+                # ignore unknown GCC warning options
+                "-Wno-unknown-warning-option",
+                # keep all other arguments but the last, which is the file name
+                *command[1:-1],
+                # add clang system include paths
+                *(
+                    arg
+                    for path in self.system_include_paths
+                    for arg in ("-isystem", path)
+                ),
+                # replace relative path to get absolute location information
+                tu.absolute_path,
+            ]
+
+        tu = self._get_translation_unit(fn)
+        vrc_path = fn + ".vrc"
+        if self.force or not os.path.exists(vrc_path):
+            args = build_libclang_command_line(tu)
+            print(f"Parsing {tu.absolute_path}")
+            self.save_graph(fn, args, vrc_path)
+
+        return vrc_path
+
+    @abc.abstractmethod
+    def save_graph(self, fn: str, args: list[str], outf: str) -> None:
+        pass
+
+    def parse(self, fn: str) -> None:
+        with open(fn, "r") as f:
+            source(f, False)
 
 
 def get_loaders() -> typing.Mapping[str, typing.Type[Loader]]:

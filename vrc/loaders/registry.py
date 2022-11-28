@@ -15,5 +15,5 @@ def _have_clang() -> bool:
 
 
 if _have_clang():
-    from .clang import ClangLoader
-    LOADERS['clang'] = ClangLoader
+    from .clang import ClangCIndexLoader
+    LOADERS['clang'] = ClangCIndexLoader
