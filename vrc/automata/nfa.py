@@ -138,7 +138,7 @@ class NFA(Automaton[StateSet]):
 
     def initial(self) -> StateSet:
         """Return the initial state of a visit on the NFA."""
-        return self.epsilon_closure(0)
+        return self.epsilon_closure(0) if self.transition else set()
 
     def advance(self, source: StateSet, symbol: str) -> StateSet:
         """Return the states reached by the NFA when fed the given symbol
