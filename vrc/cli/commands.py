@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+"""Implementation of the commands for the vrc tool."""
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 

@@ -1,3 +1,5 @@
+"""Abstract classes for loading the call graph."""
+
 import abc
 import concurrent.futures as conc
 import dataclasses

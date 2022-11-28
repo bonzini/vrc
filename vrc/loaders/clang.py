@@ -1,3 +1,5 @@
+"""Load the call graph using the Python bindings to libclang."""
+
 # Authors: Paolo Bonzini <pbonzini@redhat.com>, Alberto Faria <afaria@redhat.com>
 
 import concurrent.futures as conc

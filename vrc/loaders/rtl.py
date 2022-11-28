@@ -1,3 +1,5 @@
+"""Load the call graph by parsing GCC's RTL expansion dump."""
+
 import concurrent.futures as conc
 import glob
 import os

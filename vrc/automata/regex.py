@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+"""Thompson construction for converting regular expressions to NFAs."""
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 

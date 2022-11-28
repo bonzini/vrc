@@ -1,3 +1,6 @@
+"""Loader that uses cparser.c to convert the call graph to a VRC script
+   stored in a file."""
+
 import concurrent.futures as conc
 import os
 
@@ -25,6 +28,7 @@ cdef char **to_cstring_array(list list_str) except NULL:
     return ret
 
 
+# Export it to Python for testcases.
 cpdef int build_graph(str filename, list args, str out_path, bint verbose) except -1:
     if not out_path:
         raise TypeError("expected str")
@@ -46,6 +50,8 @@ cpdef int build_graph(str filename, list args, str out_path, bint verbose) excep
 
 class LibclangLoader(ClangLoader):
     def get_executor(self):
+        # Because build_graph can drop the GIL, a ThreadPoolExecutor can
+        # process the files in parallel.
         ncpus = os.cpu_count() or 1
         ntasks = max(2, ncpus) - 1
         return conc.ThreadPoolExecutor(max_workers=ntasks)

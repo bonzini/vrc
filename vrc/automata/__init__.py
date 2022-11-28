@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+"""Abstract classes for finite state automata."""
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 

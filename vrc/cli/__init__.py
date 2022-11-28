@@ -1,3 +1,5 @@
+"""Generic functionality related to the vrc command line."""
+
 from ..graph import Graph
 import typing
 

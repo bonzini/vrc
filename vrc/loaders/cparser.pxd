@@ -1,3 +1,5 @@
+"""Cython description of cparser.h."""
+
 from libcpp cimport bool as c_bool
 
 cdef extern from "cparser.h":

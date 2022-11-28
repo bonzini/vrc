@@ -1,3 +1,5 @@
+"""Registry of available methods to load the call graph."""
+
 from . import Loader
 from .rtl import RTLLoader
 import typing

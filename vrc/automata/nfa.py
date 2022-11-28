@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+"""Non-deterministic finite state automata."""
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
