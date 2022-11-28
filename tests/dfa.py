@@ -43,6 +43,13 @@ class DFATest(unittest.TestCase):
         assert dfa.matches("B")
         assert not dfa.matches("BA")
 
+    def test_empty(self) -> None:
+        a = DFA()
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
+        self.assertFalse(v.success())
+
     def test_reverse(self) -> None:
         dfa = self.sample_dfa().reverse()
         v = dfa.visit()
@@ -64,6 +71,13 @@ class DFATest(unittest.TestCase):
         v.visit("A")
         self.assertTrue(v.success())
         v.visit("B")
+        self.assertFalse(v.success())
+
+    def test_empty_reverse(self) -> None:
+        a = DFA().reverse()
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
         self.assertFalse(v.success())
 
     def test_minimal(self) -> None:
@@ -100,3 +114,10 @@ class DFATest(unittest.TestCase):
         self.assertTrue(dfa.matches("1111"))
         self.assertTrue(dfa.matches("10010"))
         self.assertEqual(dfa.add_state(), 3)
+
+    def test_empty_minimal(self) -> None:
+        a = DFA().reverse()
+        v = a.visit()
+        self.assertFalse(v.success())
+        v.visit("A")
+        self.assertFalse(v.success())
