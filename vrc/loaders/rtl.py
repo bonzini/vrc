@@ -1,4 +1,6 @@
+import concurrent.futures as conc
 import glob
+import os
 import re
 import shlex
 import subprocess
@@ -8,6 +10,10 @@ from . import Loader, ResolutionError, TranslationUnit
 
 
 class RTLLoader(Loader):
+    def get_executor(self) -> conc.Executor:
+        ntasks = (os.cpu_count() or 2) - 1
+        return conc.ThreadPoolExecutor(max_workers=ntasks)
+
     def resolve(self, fn: str) -> str:
         def build_gcc_S_command_line(tu: TranslationUnit, outfile: str) -> list[str]:
             out = []

@@ -1,7 +1,9 @@
 # Authors: Paolo Bonzini <pbonzini@redhat.com>, Alberto Faria <afaria@redhat.com>
 
-import clang.cindex            # type: ignore
+import concurrent.futures as conc
 import typing
+
+import clang.cindex            # type: ignore
 
 from ctypes import CFUNCTYPE, c_int, py_object
 from clang.cindex import (
@@ -147,3 +149,7 @@ class ClangCIndexLoader(ClangLoader):
         self.verbose_print(f"Writing {vrc_path}")
         with open(vrc_path, "w") as outf:
             serialize_graph(file_graph, outf)
+
+    def get_executor(self) -> conc.Executor:
+        # no parallelism
+        return conc.ThreadPoolExecutor(max_workers=1)

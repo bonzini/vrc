@@ -1,4 +1,5 @@
 import abc
+import concurrent.futures as conc
 import dataclasses
 import os
 import re
@@ -41,20 +42,33 @@ class Loader(metaclass=abc.ABCMeta):
     force: bool = False
 
     def load(self, files: list[str]) -> None:
+        executor = self.get_executor()
+        futures: set[conc.Future[typing.Tuple[str, str]]] = set()
         for fn in files:
-            resolved_fn = self.resolve(fn)
-            if resolved_fn == fn:
-                self.verbose_print(f"Reading {fn}")
-            else:
-                print(f"Reading {resolved_fn}", file=sys.stderr)
+            future = executor.submit(lambda x: (x, self.resolve(x)), fn)
+            futures.add(future)
 
-        self.parse(resolved_fn)
+        while futures:
+            done, futures = conc.wait(futures, return_when=conc.FIRST_COMPLETED)
+            for future in done:
+                try:
+                    fn, resolved_fn = future.result()
+                except ResolutionError as e:
+                    print(f"{fn}: {e.message}", file=sys.stderr)
+                    continue
+
+                self.verbose_print(f"Reading {resolved_fn}")
+                self.parse(resolved_fn)
 
     def _get_translation_unit(self, fn: str) -> TranslationUnit:
         try:
             return self.compdb[fn]
         except KeyError:
             raise ResolutionError(f"Could not find '{fn}' in compile_commands.json")
+
+    @abc.abstractmethod
+    def get_executor(self) -> conc.Executor:
+        pass
 
     @abc.abstractmethod
     def parse(self, fn: str) -> None:
