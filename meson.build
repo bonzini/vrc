@@ -3,6 +3,7 @@ project('vrc', [], version: files('VERSION'))
 fs = import('fs')
 py_mod = import('python')
 py = py_mod.find_installation()
+py_dep = py.dependency(required: false)
 
 srcfiles = [
   'vrc/__init__.py',
@@ -21,9 +22,14 @@ srcfiles = [
   'vrc/loaders/rtl.py',
 ]
 
+pure = true
+if add_languages('c', 'cython', required: false) and py_dep.found()
+  subdir('vrc/loaders')
+endif
+
 # use a loop to emulate preserve_path: true (added in 0.64)
 foreach file: srcfiles
-  py.install_sources(file, subdir: fs.parent(file))
+  py.install_sources(file, subdir: fs.parent(file), pure: pure)
 endforeach
 
 meson.add_postconf_script(find_program('scripts/build-site-packages.py'))
