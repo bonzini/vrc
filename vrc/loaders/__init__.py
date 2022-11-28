@@ -40,12 +40,13 @@ class Loader(metaclass=abc.ABCMeta):
     compdb: typing.Mapping[str, TranslationUnit]
     force: bool = False
 
-    def load(self, fn: str, ) -> None:
-        resolved_fn = self.resolve(fn)
-        if resolved_fn == fn:
-            self.verbose_print(f"Reading {fn}")
-        else:
-            print(f"Reading {resolved_fn}", file=sys.stderr)
+    def load(self, files: list[str]) -> None:
+        for fn in files:
+            resolved_fn = self.resolve(fn)
+            if resolved_fn == fn:
+                self.verbose_print(f"Reading {fn}")
+            else:
+                print(f"Reading {resolved_fn}", file=sys.stderr)
 
         self.parse(resolved_fn)
 

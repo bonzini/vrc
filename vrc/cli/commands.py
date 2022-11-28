@@ -218,12 +218,13 @@ class LoadCommand(VRCCommand):
         loader = loader_class(GRAPH, args.verbose, COMPDB, args.force)
 
         cwd = os.getcwd()
+        files = []
         for pattern in args.files:
-            for fn in expand_glob(os.path.join(cwd, os.path.expanduser(pattern))):
-                try:
-                    loader.load(fn)
-                except ResolutionError as e:
-                    print(e.message, file=sys.stderr)
+            files += expand_glob(os.path.join(cwd, os.path.expanduser(pattern)))
+        try:
+            loader.load(files)
+        except ResolutionError as e:
+            print(e.message, file=sys.stderr)
 
 
 class NodeCommand(VRCCommand):
