@@ -9,6 +9,7 @@ srcfiles = [
   'vrc/__init__.py',
   'vrc/__main__.py',
   'vrc/graph.py',
+  'vrc/matchers.py',
   'vrc/util.py',
   'vrc/automata/__init__.py',
   'vrc/automata/nfa.py',

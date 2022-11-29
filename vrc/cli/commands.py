@@ -20,7 +20,6 @@ import compynator.core                        # type: ignore
 import glob
 import io
 import json
-import operator
 import os
 import re
 import readline
@@ -559,28 +558,14 @@ class OutputCommand(VRCCommand):
 
 @typing.no_type_check
 def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]:
-    from compynator.core import One, Terminal
+    from compynator.core import Terminal
     from compynator.niceties import Forward           # type: ignore
+    from ..matchers import Node, Spaces
 
-    Space = One.where(str.isspace)
-    Spaces = Space.repeat(lower=0, reducer=lambda x, y: None)
-
-    WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
-    Word = WordChar.repeat(lower=1)
-
-    Label = Spaces.then(Word).value(lambda x: [x])
-    MoreLabels = Spaces.then(Terminal(',')).then(Label).repeat(value=[], reducer=operator.add)
-    Labels = Label.then(MoreLabels, reducer=operator.add).skip(Spaces)
-
-    AllLabels = Terminal('[').then(Labels).skip(Terminal(']')).value(
-        lambda x: regex.One(lambda y: all((y in GRAPH.labeled_nodes(label) for label in x))))
-    NoLabels = Terminal('![').then(Labels).skip(Terminal(']')).value(
-        lambda x: regex.One(lambda y: all((y not in GRAPH.labeled_nodes(label) for label in x))))
-    Node = Word.value(lambda x: regex.One(x.__eq__))
     Alt = Forward()
     Paren = Terminal('(').then(Alt).skip(Terminal(')'))
+    Atom = Node.value(lambda x: regex.One(x.as_callable(GRAPH))) | Paren
 
-    Atom = AllLabels | NoLabels | Node | Paren
     Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
     Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
 
