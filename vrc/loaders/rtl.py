@@ -57,6 +57,10 @@ class RTLLoader(Loader):
         return dumps[0]
 
     def parse_lines(self, fn: str, lines: typing.Iterator[str]) -> None:
+        m = re.match(r'(.*?)\.[0-9]*r\.expand', os.path.relpath(fn))
+        assert m is not None
+        file_label = m.group(1) + '.o'
+
         RE_FUNC1 = re.compile(r"^;; Function (\S+)\s*$")
         RE_FUNC2 = re.compile(r"^;; Function (.*)\s+\((\S+)(,.*)?\).*$")
         RE_SYMBOL_REF = re.compile(r'\(symbol_ref [^(]* \( "([^"]*)"', flags=re.X)
@@ -66,13 +70,13 @@ class RTLLoader(Loader):
                 m = RE_FUNC1.search(line)
                 if m:
                     curfunc = m.group(1)
-                    self.target.add_node(m.group(1), file=fn)
+                    self.target.add_node(m.group(1), file=file_label)
                     self.verbose_print(f"{fn}: found function {m.group(1)}")
                     continue
                 m = RE_FUNC2.search(line)
                 if m:
                     curfunc = m.group(2)
-                    self.target.add_node(m.group(2), username=m.group(1), file=fn)
+                    self.target.add_node(m.group(2), username=m.group(1), file=file_label)
                     self.verbose_print(f"{fn}: found function {m.group(1)} ({m.group(2)})")
                     continue
             elif curfunc:
