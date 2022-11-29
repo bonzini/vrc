@@ -133,6 +133,7 @@ def separated_repeat(node: typing.Any, sep: typing.Optional[typing.Any] = None) 
 @typing.no_type_check
 def _node_matcher_parser() -> Parser:
     from compynator.core import One, Terminal, Succeed
+    from compynator.niceties import Forward                # type: ignore
 
     WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
     Word = WordChar.repeat(lower=1)
@@ -145,13 +146,19 @@ def _node_matcher_parser() -> Parser:
              | One.where(lambda c: c not in r'\/')).repeat()
     Regex = Terminal('/').then(Regex).skip(Terminal('/'))
 
-    Inside = Word.value(MatchLabel)
-    Inside = separated_repeat(Inside, Terminal(','))
+    Disjunction = Forward()
+    Paren = Terminal('[').then(Disjunction).skip(Terminal(']'))
+    Common = Quoted.value(MatchByName) | Regex.value(MatchByRegex) | Paren
 
-    AllLabels = Terminal('[').then(Inside.value(lambda args: MatchAnd(*args)) | Succeed(MatchAnd())).skip(Terminal(']'))
-    NoLabels = Terminal('![').then(Inside.value(lambda args: MatchNot(MatchOr(*args)))).skip(Terminal(']'))
+    Inside = Common | Word.value(MatchLabel) | Succeed(MatchAnd())
+    Inside = Terminal('!').then(Inside).value(MatchNot) | Inside
 
-    return AllLabels | NoLabels | Regex.value(MatchByRegex) | (Word | Quoted).value(MatchByName)
+    Conjunction = separated_repeat(Inside, Terminal(',')).value(lambda args: MatchAnd(*args))
+    Disjunction.is_(separated_repeat(Conjunction, Terminal('|')).value(lambda args: MatchOr(*args)))
+
+    Outside = Common | Word.value(MatchByName)
+    Outside = Terminal('!').then(Outside).value(MatchNot) | Outside
+    return Outside
 
 
 Node = _node_matcher_parser()

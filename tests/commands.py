@@ -69,8 +69,11 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test("blah", [])
         self.do_parse_test("[]", ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
         self.do_parse_test("[L1,L2]", ["l12"])
-        self.do_parse_test("![L1,L2]", ["a", "b", "f(int, float)", "func_a"])
+        self.do_parse_test("[L1|L2]", ["l1", "l2", "l12"])
+        self.do_parse_test("![L1|L2]", ["a", "b", "f(int, float)", "func_a"])
+        self.do_parse_test("[!L1,!L2]", ["a", "b", "f(int, float)", "func_a"])
         self.do_parse_test("/^func_/", ["func_a"])
+        self.do_parse_test('[/^f/,!"func_a"]', ["f(int, float)"])
         self.do_parse_test('"f(int, float)"', ["f(int, float)"])
 
 
