@@ -560,7 +560,7 @@ class OutputCommand(VRCCommand):
 def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]:
     from compynator.core import Terminal
     from compynator.niceties import Forward           # type: ignore
-    from ..matchers import Node, Spaces
+    from ..matchers import Node, separated_repeat
 
     Alt = Forward()
     Paren = Terminal('(').then(Alt).skip(Terminal(')'))
@@ -569,11 +569,8 @@ def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.
     Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
     Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
 
-    Element = (Any | Star).skip(Spaces)
-    Sequence = Spaces.then(Element.repeat(lower=1, value=None, reducer=lambda x, y: y if not x else regex.Sequence(x, y)))
-
-    Rest = (Terminal('|').then(Sequence)).repeat(value=None, reducer=lambda x, y: y if not x else regex.Alt(x, y))
-    Alt.is_(Sequence.then(Rest, reducer=lambda x, y: x if not y else regex.Alt(x, y)))
+    Sequence = separated_repeat(Any | Star).value(lambda args: regex.Sequence(*args))
+    Alt.is_(separated_repeat(Sequence, Terminal('|')).value(lambda args: regex.Alt(*args)))
     return Alt
 
 
