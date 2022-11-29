@@ -2,7 +2,7 @@ import typing
 import unittest
 from vrc.automata import regex, Automaton
 from vrc.graph import Graph
-from vrc.matchers import Matcher, MatchByName, MatchLabel, MatchAnd, MatchOr, MatchNot, Node
+from vrc.matchers import Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot, Node
 from vrc.cli.commands import PathsCommand
 
 
@@ -41,6 +41,10 @@ class MatcherTest(unittest.TestCase):
         self.do_test(MatchByName("blah"), [])
         self.do_test(MatchByName("f(int, float)"), ["f(int, float)"])
 
+    def test_by_regex(self) -> None:
+        self.do_test(MatchByRegex("a$"), ["a", "func_a"])
+        self.do_test(MatchByRegex("^func_"), ["func_a"])
+
     def test_label(self) -> None:
         self.do_test(MatchLabel("L1"), ["l1", "l12"])
         self.do_test(MatchLabel("L2"), ["l2", "l12"])
@@ -66,6 +70,7 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test("[]", ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
         self.do_parse_test("[L1,L2]", ["l12"])
         self.do_parse_test("![L1,L2]", ["a", "b", "f(int, float)", "func_a"])
+        self.do_parse_test("/^func_/", ["func_a"])
 
 
 class RegexTest(unittest.TestCase):
@@ -124,6 +129,16 @@ class RegexTest(unittest.TestCase):
         self.assertTrue(nfa.matches("aaaaa"))
         self.assertFalse(nfa.matches("baaaa"))
         self.assertFalse(nfa.matches("aaaab"))
+
+    def test_regex(self) -> None:
+        nfa = self.parse("/^func_/")
+        self.assertFalse(nfa.matches([]))
+        self.assertTrue(nfa.matches(["func_a"]))
+        self.assertFalse(nfa.matches(["_func_a"]))
+
+        nfa = self.parse("a /blah/ c")
+        self.assertFalse(nfa.matches("ablahc"))
+        self.assertTrue(nfa.matches(["a", "xblahy", "c"]))
 
     def test_any(self) -> None:
         nfa = self.parse("a [] c")

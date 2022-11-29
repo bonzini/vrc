@@ -3,6 +3,7 @@
 import abc
 import compynator.core         # type: ignore
 import dataclasses
+import re
 import typing
 
 from .automata import nfa
@@ -29,6 +30,17 @@ class MatchByName(Matcher):
 
     def as_callable(self, g: Graph) -> nfa.Matcher:
         return self.node.__eq__
+
+
+@dataclasses.dataclass
+class MatchByRegex(Matcher):
+    pat: re.Pattern[str]
+
+    def __init__(self, regex: str):
+        self.pat = re.compile(regex)
+
+    def as_callable(self, g: Graph) -> nfa.Matcher:
+        return lambda x: bool(self.pat.search(x))
 
 
 @dataclasses.dataclass
@@ -125,13 +137,17 @@ def _node_matcher_parser() -> Parser:
     WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
     Word = WordChar.repeat(lower=1)
 
+    Regex = (One.where(lambda c: c == '\\').then(One.where(lambda c: True))
+             | One.where(lambda c: c not in r'\/')).repeat()
+    Regex = Terminal('/').then(Regex).skip(Terminal('/'))
+
     Inside = Word.value(MatchLabel)
     Inside = separated_repeat(Inside, Terminal(','))
 
     AllLabels = Terminal('[').then(Inside.value(lambda args: MatchAnd(*args)) | Succeed(MatchAnd())).skip(Terminal(']'))
     NoLabels = Terminal('![').then(Inside.value(lambda args: MatchNot(MatchOr(*args)))).skip(Terminal(']'))
 
-    return AllLabels | NoLabels | Word.value(MatchByName)
+    return AllLabels | NoLabels | Regex.value(MatchByRegex) | Word.value(MatchByName)
 
 
 Node = _node_matcher_parser()
