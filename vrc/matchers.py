@@ -137,6 +137,10 @@ def _node_matcher_parser() -> Parser:
     WordChar = One.where(lambda c: c.isalnum() or c == '_' or c == '.')
     Word = WordChar.repeat(lower=1)
 
+    Quoted = (One.where(lambda c: c == '\\').then(One.where(lambda c: True))
+              | One.where(lambda c: c not in r'\"')).repeat()
+    Quoted = Terminal('"').then(Quoted).skip(Terminal('"'))
+
     Regex = (One.where(lambda c: c == '\\').then(One.where(lambda c: True))
              | One.where(lambda c: c not in r'\/')).repeat()
     Regex = Terminal('/').then(Regex).skip(Terminal('/'))
@@ -147,7 +151,7 @@ def _node_matcher_parser() -> Parser:
     AllLabels = Terminal('[').then(Inside.value(lambda args: MatchAnd(*args)) | Succeed(MatchAnd())).skip(Terminal(']'))
     NoLabels = Terminal('![').then(Inside.value(lambda args: MatchNot(MatchOr(*args)))).skip(Terminal(']'))
 
-    return AllLabels | NoLabels | Regex.value(MatchByRegex) | Word.value(MatchByName)
+    return AllLabels | NoLabels | Regex.value(MatchByRegex) | (Word | Quoted).value(MatchByName)
 
 
 Node = _node_matcher_parser()

@@ -71,6 +71,7 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test("[L1,L2]", ["l12"])
         self.do_parse_test("![L1,L2]", ["a", "b", "f(int, float)", "func_a"])
         self.do_parse_test("/^func_/", ["func_a"])
+        self.do_parse_test('"f(int, float)"', ["f(int, float)"])
 
 
 class RegexTest(unittest.TestCase):
