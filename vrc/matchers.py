@@ -55,8 +55,32 @@ class MatchLabel(Matcher):
 
 
 @dataclasses.dataclass
+class MatchWrapper(Matcher):
+    matcher: Matcher
+
+    def __new__(cls, matcher: Matcher) -> Matcher:   # type: ignore
+        if isinstance(matcher, MatchWrapper):
+            assert not isinstance(matcher.matcher, MatchWrapper)
+            return matcher.matcher
+        else:
+            return super().__new__(cls)
+
+    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+        return self.matcher.match_nodes_in_graph(g)
+
+    def as_callable(self, g: Graph) -> nfa.Matcher:
+        return self.matcher.as_callable(g)
+
+
+@dataclasses.dataclass
 class MatchAnd(Matcher):
     matchers: typing.Iterable[Matcher]
+
+    def __new__(cls, *matchers: Matcher) -> Matcher:   # type: ignore
+        if len(matchers) == 1:
+            return MatchWrapper(matchers[0])
+        else:
+            return super().__new__(cls)
 
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
@@ -82,6 +106,13 @@ class MatchAnd(Matcher):
 class MatchNot(Matcher):
     matcher: Matcher
 
+    def __new__(cls, matcher: Matcher) -> Matcher:   # type: ignore
+        if isinstance(matcher, MatchNot):
+            assert not isinstance(matcher.matcher, MatchNot)
+            return matcher.matcher
+        else:
+            return super().__new__(cls)
+
     def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
         result = set(g.all_nodes(True))
         for node in self.matcher.match_nodes_in_graph(g):
@@ -96,6 +127,12 @@ class MatchNot(Matcher):
 @dataclasses.dataclass
 class MatchOr(Matcher):
     matchers: typing.Iterable[Matcher]
+
+    def __new__(cls, *matchers: Matcher) -> Matcher:   # type: ignore
+        if len(matchers) == 1:
+            return MatchWrapper(matchers[0])
+        else:
+            return super().__new__(cls)
 
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
