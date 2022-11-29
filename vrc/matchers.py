@@ -162,3 +162,4 @@ def _node_matcher_parser() -> Parser:
 
 
 Node = _node_matcher_parser()
+Nodes = separated_repeat(Node).value(lambda args: MatchOr(*args))
