@@ -20,7 +20,6 @@ import glob
 import io
 import json
 import os
-import re
 import readline
 import subprocess
 import sys
@@ -572,13 +571,10 @@ class OutputCommand(VRCCommand):
                 i = 0
                 for file in GRAPH.nodes_by_file.keys():
                     file_nodes = list(GRAPH.all_nodes_for_file(file))
-                    m = re.match(r'(.*?)\.[0-9]*r\.expand', os.path.relpath(file))
-                    assert m is not None
-                    label = m.group(1)
                     if not file_nodes:
                         continue
                     print(f"subgraph cluster_{i}", "{", file=f)
-                    print(f'label = "{label}";', file=f)
+                    print(f'label = "{file}";', file=f)
                     for func in file_nodes:
                         print(f'"{func}";', file=f)
                     print("}", file=f)
