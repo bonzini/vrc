@@ -154,10 +154,62 @@ class MatchOr(Matcher):
         return lambda x: any((c(x) for c in callables))
 
 
+@dataclasses.dataclass
+class MatchCallees(Matcher):
+    matcher: Matcher
+
+    def __init__(self, matcher: Matcher):
+        self.matcher = matcher
+
+    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+        # TODO: what to do about external_ok/ref_ok?
+        nodes: set[str] = set()
+        for n in self.matcher.match_nodes_in_graph(g):
+            nodes.update(g.callees(n, False, False))
+
+        yield from nodes
+
+    def as_callable(self, g: Graph) -> nfa.Matcher:
+        nodes = list(self.match_nodes_in_graph(g))
+        return lambda x: x in nodes
+
+
+@dataclasses.dataclass
+class MatchCallers(Matcher):
+    matcher: Matcher
+
+    def __init__(self, matcher: Matcher):
+        self.matcher = matcher
+
+    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+        # TODO: what to do about ref_ok?
+        nodes: set[str] = set()
+        for n in self.matcher.match_nodes_in_graph(g):
+            nodes.update(g.callers(n, False))
+
+        yield from nodes
+
+    def as_callable(self, g: Graph) -> nfa.Matcher:
+        nodes = list(self.match_nodes_in_graph(g))
+        return lambda x: x in nodes
+
+
 Parser = typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]
 
 Space = compynator.core.One.where(str.isspace)
 Spaces = Space.repeat(lower=0, reducer=lambda x, y: None)
+
+
+_T = typing.TypeVar('_T')
+
+
+def _compose(*args: typing.Callable[[_T], _T]) -> typing.Callable[[_T], _T]:
+    def result(x: _T) -> _T:
+        for f in args:
+            x = f(x)
+        return x
+
+    return result
 
 
 def separated_repeat(node: typing.Any, sep: typing.Optional[typing.Any] = None) -> typing.Any:
@@ -183,18 +235,25 @@ def _node_matcher_parser() -> Parser:
              | One.where(lambda c: c not in r'\/')).repeat()
     Regex = Terminal('/').then(Regex).skip(Terminal('/'))
 
+    Operator = \
+        Terminal(':callees').value(lambda x: [MatchCallees]) | \
+        Terminal(':callers').value(lambda x: [MatchCallers])
+    Operators = Spaces.then(Operator).repeat(value=[]).value(lambda args: _compose(*args))
+
     Disjunction = Forward()
     Paren = Terminal('[').then(Disjunction).skip(Terminal(']'))
     Common = Quoted.value(MatchByName) | Regex.value(MatchByRegex) | Paren
 
     Inside = Common | Word.value(MatchLabel) | Succeed(MatchAnd())
     Inside = Terminal('!').then(Inside).value(MatchNot) | Inside
+    Inside = Inside.then(Operators, reducer=lambda x, y: y(x))
 
     Conjunction = separated_repeat(Inside, Terminal(',')).value(lambda args: MatchAnd(*args))
     Disjunction.is_(separated_repeat(Conjunction, Terminal('|')).value(lambda args: MatchOr(*args)))
 
     Outside = Common | Word.value(MatchByName)
     Outside = Terminal('!').then(Outside).value(MatchNot) | Outside
+    Outside = Outside.then(Operators, reducer=lambda x, y: y(x))
     return Spaces.then(Outside)
 
 

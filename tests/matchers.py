@@ -2,38 +2,43 @@ import typing
 import unittest
 from vrc.automata import regex, Automaton
 from vrc.graph import Graph
-from vrc.matchers import Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot, Node, Path
+from vrc.matchers import (
+    Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot,
+    MatchCallers, MatchCallees, Node, Path
+)
+
+
+def sample_graph() -> Graph:
+    g = Graph()
+    g.add_node("a")
+    g.add_node("b")
+    g.add_node("func_a")
+    g.add_node("l1")
+    g.add_node("l2")
+    g.add_node("l12")
+    g.add_node("f(int, float)")
+
+    g.add_edge("a", "b", "call")
+    g.add_edge("func_a", "b", "ref")
+
+    g.add_label("l1", "L1")
+    g.add_label("l2", "L2")
+    g.add_label("l12", "L1")
+    g.add_label("l12", "L2")
+    return g
 
 
 class MatcherTest(unittest.TestCase):
-    @staticmethod
-    def sample_graph() -> Graph:
-        g = Graph()
-        g.add_node("a")
-        g.add_node("b")
-        g.add_node("func_a")
-        g.add_node("l1")
-        g.add_node("l2")
-        g.add_node("l12")
-        g.add_node("f(int, float)")
-
-        g.add_label("l1", "L1")
-        g.add_label("l2", "L2")
-        g.add_label("l12", "L1")
-        g.add_label("l12", "L2")
-        return g
-
-    def do_test(self, m: Matcher, results: list[str]) -> None:
-        g = MatcherTest.sample_graph()
+    def do_test(self, m: Matcher, results: list[str], g: Graph = sample_graph()) -> None:
         self.assertEqual(sorted(list(m.match_nodes_in_graph(g))), sorted(results))
 
         c = m.as_callable(g)
-        for node in ["a", "b", "func_a", "l1", "l2", "l12"]:
+        for node in g.all_nodes(True):
             self.assertEqual(c(node), node in results)
 
-    def do_parse_test(self, s: str, results: list[str]) -> None:
+    def do_parse_test(self, s: str, results: list[str], g: Graph = sample_graph()) -> None:
         parse_result = next(iter(Node(s)))
-        self.do_test(parse_result.value, results)
+        self.do_test(parse_result.value, results, g)
 
     def test_by_name(self) -> None:
         self.do_test(MatchByName("a"), ["a"])
@@ -63,6 +68,40 @@ class MatcherTest(unittest.TestCase):
         self.do_test(MatchOr(), [])
         self.do_test(MatchOr(MatchLabel("L1"), MatchByName("l2")), ["l1", "l2", "l12"])
 
+    def test_callers(self) -> None:
+        self.do_test(MatchCallers(MatchByName("b")), ["a"])
+
+    def test_callees(self) -> None:
+        g = Graph()
+        g.add_node("a")
+        g.add_node("b")
+        g.add_node("c")
+        g.add_node("d")
+        g.add_node("e")
+        g.add_label("a", "CO")
+        g.add_edge("a", "b", "call")
+        g.add_edge("a", "c", "call")
+        g.add_label("c", "CO")
+        g.add_edge("c", "d", "call")
+        g.add_edge("d", "c", "call")
+        g.add_edge("d", "e", "call")
+
+        not_co = MatchNot(MatchLabel("CO"))
+        self.do_test(not_co, ["b", "d", "e"], g)
+        self.do_parse_test("[!CO]", ["b", "d", "e"], g)
+
+        co_callees = MatchCallees(MatchLabel("CO"))
+        self.do_test(co_callees, ["b", "c", "d"], g)
+        self.do_parse_test("[CO:callees]", ["b", "c", "d"], g)
+
+        not_co_callees = MatchCallees(MatchNot(MatchLabel("CO")))
+        self.do_test(not_co_callees, ["c", "e"], g)
+        self.do_parse_test("[!CO:callees]", ["c", "e"], g)
+
+        co_candidate = MatchAnd(not_co, co_callees, MatchNot(not_co_callees))
+        self.do_test(co_candidate, ["b", "d"], g)
+        self.do_parse_test("[!CO,CO:callees,![!CO:callees]]", ["b", "d"], g)
+
     def test_parsers(self) -> None:
         self.do_parse_test("a", ["a"])
         self.do_parse_test("blah", [])
@@ -75,6 +114,10 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test('[/^f/,!"func_a"]', ["f(int, float)"])
         self.do_parse_test('"f(int, float)"', ["f(int, float)"])
 
+        self.do_parse_test('b:callers', ["a"])
+        self.do_parse_test('["b":callers]', ["a"])
+        self.do_parse_test('["b"]:callers', ["a"])
+
     def test_spaces(self) -> None:
         self.do_parse_test(" [L1,L2]", ["l12"])
         self.do_parse_test("[ L1,L2]", ["l12"])
@@ -82,6 +125,12 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test("[L1, L2]", ["l12"])
         self.do_parse_test("[L1,L2 ]", ["l12"])
         self.do_parse_test("[L1,L2] ", ["l12"])
+
+        self.do_parse_test('b :callers ', ["a"])
+        self.do_parse_test('["b" :callers]', ["a"])
+        self.do_parse_test('["b":callers ]', ["a"])
+        self.do_parse_test('["b"] :callers', ["a"])
+        self.do_parse_test('["b"]:callers ', ["a"])
 
 
 class RegexTest(unittest.TestCase):
