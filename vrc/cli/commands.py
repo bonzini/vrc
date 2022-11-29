@@ -12,7 +12,6 @@
 import argparse
 from . import serialize_graph
 from .. import matchers
-from ..automata import regex
 from ..graph import Graph
 from ..loaders import ResolutionError, TranslationUnit, get_loaders
 from collections import defaultdict
@@ -575,24 +574,6 @@ class OutputCommand(VRCCommand):
             emit(sys.stdout)
 
 
-@typing.no_type_check
-def _path_regex_parser() -> typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]:
-    from compynator.core import Terminal
-    from compynator.niceties import Forward           # type: ignore
-    from ..matchers import separated_repeat
-
-    Alt = Forward()
-    Paren = Terminal('(').then(Alt).skip(Terminal(')'))
-    Atom = matchers.Node.value(lambda x: regex.One(x.as_callable(GRAPH))) | Paren
-
-    Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
-    Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
-
-    Sequence = separated_repeat(Any | Star).value(lambda args: regex.Sequence(*args))
-    Alt.is_(separated_repeat(Sequence, Terminal('|')).value(lambda args: regex.Alt(*args)))
-    return Alt
-
-
 class PathsCommand(VRCCommand):
     NAME = ('paths', )
 
@@ -604,10 +585,8 @@ class PathsCommand(VRCCommand):
                             help="Include references to functions.")
         parser.add_argument("expr", metavar="EXPR", nargs="+")
 
-    PARSER = _path_regex_parser()
-
     def run(self, args: argparse.Namespace) -> None:
-        result = parse_argument_expr(PathsCommand.PARSER, " ".join(args.expr))
+        result = parse_argument_expr(matchers.Path(GRAPH), " ".join(args.expr))
         dfa = result.nfa().lazy_dfa()
         try:
             for path in GRAPH.paths(dfa, args.include_external, args.include_ref):

@@ -2,8 +2,7 @@ import typing
 import unittest
 from vrc.automata import regex, Automaton
 from vrc.graph import Graph
-from vrc.matchers import Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot, Node
-from vrc.cli.commands import PathsCommand
+from vrc.matchers import Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot, Node, Path
 
 
 class MatcherTest(unittest.TestCase):
@@ -80,7 +79,8 @@ class MatcherTest(unittest.TestCase):
 class RegexTest(unittest.TestCase):
     @staticmethod
     def parse(s: str) -> Automaton[typing.Any]:
-        result: regex.RegexAST = next(iter(PathsCommand.PARSER(s))).value
+        g = Graph()
+        result: regex.RegexAST = next(iter(Path(g)(s))).value
         return result.nfa().lazy_dfa()
 
     def test_one(self) -> None:

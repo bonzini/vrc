@@ -1,6 +1,6 @@
 tests = [
-  'commands.py',
   'graph.py',
+  'matchers.py',
   'nfa.py',
 ]
 

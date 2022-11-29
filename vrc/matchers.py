@@ -1,4 +1,4 @@
-"""Matching syntax for individual nodes."""
+"""Matching syntax for nodes and regular paths."""
 
 import abc
 import compynator.core         # type: ignore
@@ -6,7 +6,7 @@ import dataclasses
 import re
 import typing
 
-from .automata import nfa
+from .automata import nfa, regex
 from .graph import Graph
 
 
@@ -200,3 +200,23 @@ def _node_matcher_parser() -> Parser:
 
 Node = _node_matcher_parser()
 Nodes = separated_repeat(Node).value(lambda args: MatchOr(*args))
+
+
+@typing.no_type_check
+def _path_regex_parser(g: Graph) -> Parser:
+    from compynator.core import Terminal
+    from compynator.niceties import Forward
+
+    Alt = Forward()
+    Paren = Terminal('(').then(Alt).skip(Terminal(')'))
+    Atom = Node.value(lambda x: regex.One(x.as_callable(g))) | Paren
+
+    Star = Atom.then(Terminal('*').repeat(lower=0, upper=1), reducer=lambda x, y: x if not y else regex.Star(x))
+    Any = Terminal('...').value(regex.Star(regex.One(lambda x: True)))
+
+    Sequence = separated_repeat(Any | Star).value(lambda args: regex.Sequence(*args))
+    Alt.is_(separated_repeat(Sequence, Terminal('|')).value(lambda args: regex.Alt(*args)))
+    return Alt
+
+
+Path = _path_regex_parser
