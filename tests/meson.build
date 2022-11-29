@@ -16,7 +16,7 @@ endforeach
 
 if get_option('pytest_tap')
   test('pytest', py, args: [ '-m', 'pytest' , '--tap-stream' ],
-       env: testenv,
+       env: testenv, protocol: 'tap',
        workdir: meson.project_build_root() / 'tests')
 else
   test('pytest', py, args: [ '-m', 'pytest' ],
