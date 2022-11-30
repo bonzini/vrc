@@ -17,6 +17,7 @@ import sys
 import typing
 
 from .commands import VRCCommand, Completer, FileCompleter
+from ..matchers import ParseError
 
 
 class NoUsageFormatter(argparse.HelpFormatter):
@@ -86,6 +87,10 @@ class SourceCommand(VRCCommand):
                 args = PARSER.parse_args(argv)
                 try:
                     args.cmdclass().run(args)
+                except ParseError as e:
+                    print(e.message, file=sys.stderr)
+                    if exit_first:
+                        break
                 except OSError as e:
                     print(e)
                     if exit_first:

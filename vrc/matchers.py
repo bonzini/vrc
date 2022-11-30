@@ -279,3 +279,27 @@ def _path_regex_parser(g: Graph) -> Parser:
 
 
 Path = _path_regex_parser
+
+
+class ParseError(Exception):
+    @property
+    def message(self) -> str:
+        return str(self.args[0])
+
+
+def _compynator_parse(p: Parser, s: str) -> typing.Any:
+    results = p(s)
+    if not isinstance(results, compynator.core.Success):
+        raise ParseError(f"invalid search terms at '{s}'")
+    result = next(iter(results))
+    if result.remain:
+        raise ParseError(f"invalid search terms at '{result.remain}'")
+    return result.value
+
+
+def parse_nodespec(s: str) -> Matcher:
+    return _compynator_parse(Nodes, s)  # type: ignore
+
+
+def parse_pathspec(g: Graph, s: str) -> regex.RegexAST:
+    return _compynator_parse(Path(g), s)  # type: ignore

@@ -1,10 +1,10 @@
 import typing
 import unittest
-from vrc.automata import regex, Automaton
+from vrc.automata import Automaton
 from vrc.graph import Graph
 from vrc.matchers import (
     Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot,
-    MatchCallers, MatchCallees, Node, Path
+    MatchCallers, MatchCallees, parse_nodespec, parse_pathspec
 )
 
 
@@ -37,8 +37,8 @@ class MatcherTest(unittest.TestCase):
             self.assertEqual(c(node), node in results)
 
     def do_parse_test(self, s: str, results: list[str], g: Graph = sample_graph()) -> None:
-        parse_result = next(iter(Node(s)))
-        self.do_test(parse_result.value, results, g)
+        parse_result = parse_nodespec(s)
+        self.do_test(parse_result, results, g)
 
     def test_by_name(self) -> None:
         self.do_test(MatchByName("a"), ["a"])
@@ -137,8 +137,7 @@ class RegexTest(unittest.TestCase):
     @staticmethod
     def parse(s: str) -> Automaton[typing.Any]:
         g = Graph()
-        result: regex.RegexAST = next(iter(Path(g)(s))).value
-        return result.nfa().lazy_dfa()
+        return parse_pathspec(g, s).nfa().lazy_dfa()
 
     def test_one(self) -> None:
         nfa = self.parse("a")
