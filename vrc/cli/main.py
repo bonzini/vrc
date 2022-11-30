@@ -17,6 +17,7 @@ import sys
 import typing
 
 from .commands import VRCCommand, Completer, FileCompleter
+from ..loaders import ResolutionError
 from ..matchers import ParseError
 
 
@@ -87,7 +88,7 @@ class SourceCommand(VRCCommand):
                 args = PARSER.parse_args(argv)
                 try:
                     args.cmdclass().run(args)
-                except ParseError as e:
+                except (ParseError, ResolutionError) as e:
                     print(e.message, file=sys.stderr)
                     if exit_first:
                         break

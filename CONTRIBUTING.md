@@ -9,3 +9,8 @@ The most efficient development experience is obtained by using `meson`
 directly.  `vrc` supports `meson devenv` and `meson test`, so that
 tests can be run using `meson test` and the `vrc` tool can be started
 using `meson devenv python -m vrc`.
+
+# TODO
+
+* Write documentation
+* Change args.verbose_print mechanism to logger

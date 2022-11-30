@@ -13,7 +13,7 @@ import argparse
 from . import serialize_graph
 from ..matchers import parse_nodespec, parse_pathspec
 from ..graph import Graph
-from ..loaders import ResolutionError, TranslationUnit, get_loaders
+from ..loaders import TranslationUnit, get_loaders
 from collections import defaultdict
 from contextlib import contextmanager
 import glob
@@ -219,10 +219,7 @@ class LoadCommand(VRCCommand):
         files = []
         for pattern in args.files:
             files += expand_glob(os.path.join(cwd, os.path.expanduser(pattern)))
-        try:
-            loader.load(files)
-        except ResolutionError as e:
-            print(e.message, file=sys.stderr)
+        loader.load(files)
 
 
 class NodeCommand(VRCCommand):
