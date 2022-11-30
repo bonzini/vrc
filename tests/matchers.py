@@ -75,6 +75,14 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test('[/^f/,!"func_a"]', ["f(int, float)"])
         self.do_parse_test('"f(int, float)"', ["f(int, float)"])
 
+    def test_spaces(self) -> None:
+        self.do_parse_test(" [L1,L2]", ["l12"])
+        self.do_parse_test("[ L1,L2]", ["l12"])
+        self.do_parse_test("[L1 ,L2]", ["l12"])
+        self.do_parse_test("[L1, L2]", ["l12"])
+        self.do_parse_test("[L1,L2 ]", ["l12"])
+        self.do_parse_test("[L1,L2] ", ["l12"])
+
 
 class RegexTest(unittest.TestCase):
     @staticmethod

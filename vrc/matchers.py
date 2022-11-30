@@ -161,10 +161,10 @@ Spaces = Space.repeat(lower=0, reducer=lambda x, y: None)
 
 
 def separated_repeat(node: typing.Any, sep: typing.Optional[typing.Any] = None) -> typing.Any:
-    node = node.value(lambda x: [x])
+    node = Spaces.then(node).value(lambda x: [x])
     sep = Spaces.then(sep) if sep else Spaces
     rest = sep.then(node).repeat(value=[])
-    return Spaces.then(node + rest).skip(Spaces)
+    return (node + rest).skip(Spaces)
 
 
 @typing.no_type_check
@@ -195,7 +195,7 @@ def _node_matcher_parser() -> Parser:
 
     Outside = Common | Word.value(MatchByName)
     Outside = Terminal('!').then(Outside).value(MatchNot) | Outside
-    return Outside
+    return Spaces.then(Outside)
 
 
 Node = _node_matcher_parser()
