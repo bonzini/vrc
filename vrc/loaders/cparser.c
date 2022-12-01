@@ -176,6 +176,7 @@ void build_graph(const char *filename, const char *const *args, int num_args,
     }
 
     VisitorState state = {
+        .filename = filename,
         .outf = outf,
         .verbose = verbose,
     };
