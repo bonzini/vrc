@@ -55,8 +55,8 @@ void add_label(VisitorState *state, CXCursor attr)
 
     verbose_print(state, "found annotation %s", clang_getCString(attr_str));
     fprintf(state->outf, "label %s %s\n",
-            clang_getCString(state->current_function),
-            clang_getCString(attr_str));
+            clang_getCString(attr_str),
+            clang_getCString(state->current_function));
 
     clang_disposeString(attr_str);
 }
