@@ -231,6 +231,9 @@ def main() -> None:
         print('Written by Paolo Bonzini')
         sys.exit(0)
 
+    if len(sys.argv) > 1 and sys.argv[1] == '-C':
+        os.chdir(sys.argv[2])
+
     if os.path.exists("compile_commands.json"):
         print("Loading compile_commands.json", file=sys.stderr)
         args = PARSER.parse_args(["compdb", "compile_commands.json"])
