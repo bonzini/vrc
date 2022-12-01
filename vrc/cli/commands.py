@@ -102,10 +102,6 @@ class VRCCommand:
     def eat(*args: list[typing.Any]) -> None:
         pass
 
-    @staticmethod
-    def print_stderr(*args: list[typing.Any]) -> None:
-        print(*args, file=sys.stderr)
-
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
         """Setup argument parser"""
@@ -162,7 +158,7 @@ class CompdbCommand(VRCCommand):
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--verbose", action="store_const",
-                            const=VRCCommand.print_stderr, default=VRCCommand.eat,
+                            const=print, default=VRCCommand.eat,
                             help="Report progress while parsing")
         parser.add_argument("file", metavar="FILE",
                             help="JSON file to be loaded")
@@ -189,7 +185,7 @@ class LoadCommand(VRCCommand):
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--verbose", action="store_const",
-                            const=VRCCommand.print_stderr, default=VRCCommand.eat,
+                            const=print, default=VRCCommand.eat,
                             help="Report progress while parsing")
         parser.add_argument("--force", action="store_true",
                             help="Do not use cached result")

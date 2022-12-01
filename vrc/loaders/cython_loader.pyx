@@ -58,4 +58,4 @@ class LibclangLoader(ClangLoader):
 
     def save_graph(self, filename, args, out_path):
         build_graph(filename, args, out_path,
-                    self.verbose_print is VRCCommand.print_stderr)
+                    self.verbose_print is print)
