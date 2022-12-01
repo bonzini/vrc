@@ -102,6 +102,13 @@ class VRCCommand:
     def eat(*args: list[typing.Any]) -> None:
         pass
 
+    @staticmethod
+    def positive_int(value: str) -> int:
+        number = int(value)
+        if number <= 0:
+            raise argparse.ArgumentTypeError(f"Number {value} must be positive.")
+        return number
+
     @classmethod
     def args(self, parser: argparse.ArgumentParser) -> None:
         """Setup argument parser"""
@@ -587,14 +594,20 @@ class PathsCommand(VRCCommand):
                             help="Include external functions.")
         parser.add_argument("--include-ref", action="store_true",
                             help="Include references to functions.")
+        parser.add_argument("--limit", type=VRCCommand.positive_int,
+                            help="Number of paths to print.")
         parser.add_argument("expr", metavar="EXPR", nargs="+")
 
     def run(self, args: argparse.Namespace) -> None:
         result = parse_pathspec(GRAPH, " ".join(args.expr))
         dfa = result.nfa().lazy_dfa()
+        n = 0
         try:
             for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
                 print(" <- ".join(path))
+                n += 1
+                if n == args.limit:
+                    break
         except KeyboardInterrupt:
             print("Interrupt", file=sys.stderr)
             return
