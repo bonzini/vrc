@@ -436,7 +436,7 @@ class CallersCommand(VRCCommand):
                 result[i].append(f)
 
         for caller, callees in result.items():
-            print(f"{caller} -> {', '.join(callees)}")
+            print(f"{', '.join(callees)} <- {caller}")
 
 
 class CalleesCommand(VRCCommand):
@@ -464,7 +464,7 @@ class CalleesCommand(VRCCommand):
                 result[i].append(f)
 
         for callee, callers in result.items():
-            print(f"{', '.join(callers)} -> {callee}")
+            print(f"{callee} <- {', '.join(callers)}")
 
 
 class LabelsCommand(VRCCommand):
