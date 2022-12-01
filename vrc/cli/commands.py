@@ -11,7 +11,7 @@
 
 import argparse
 from . import serialize_graph
-from ..matchers import parse_nodespec, parse_pathspec
+from ..matchers import MatchAnd, MatchLabel, parse_nodespec, parse_pathspec
 from ..graph import Graph
 from ..loaders import TranslationUnit, get_loaders
 from collections import defaultdict
@@ -458,6 +458,30 @@ class CalleesCommand(VRCCommand):
 
         for callee, callers in result.items():
             print(f"{', '.join(callers)} -> {callee}")
+
+
+class LabelsCommand(VRCCommand):
+    """Prints the labels of all the specified functions."""
+    NAME = ("labels",)
+
+    @classmethod
+    def args(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("funcs", metavar="FUNC", nargs="+",
+                            help="The functions to be filtered")
+
+    @classmethod
+    def get_completer(cls, nwords: int) -> Completer:
+        return NodeCompleter()
+
+    def run(self, args: argparse.Namespace) -> None:
+        matcher = parse_nodespec(" ".join(args.funcs))
+        result = defaultdict(lambda: list())
+        for label in sorted(GRAPH.labels()):
+            for f in MatchAnd(MatchLabel(label), matcher).match_nodes_in_graph(GRAPH):
+                result[f].append(label)
+
+        for func, labels in result.items():
+            print(f"{func}: {', '.join(labels)}")
 
 
 class SaveCommand(VRCCommand):
