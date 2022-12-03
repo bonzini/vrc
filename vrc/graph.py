@@ -242,10 +242,10 @@ class Graph:
         if name in self.omitted:
             self.omitted.remove(name)
 
-    def labels(self) -> set[str]:
-        return set(self.node_labels.keys())
+    def labels(self) -> typing.Iterable[str]:
+        return self.node_labels.keys()
 
-    def labeled_nodes(self, label: str) -> set[str]:
+    def labeled_nodes(self, label: str) -> typing.Iterable[str]:
         return self.node_labels[label]
 
     def add_label(self, node: str, label: str) -> None:
