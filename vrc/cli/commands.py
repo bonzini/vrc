@@ -237,16 +237,14 @@ class NodeCommand(VRCCommand):
                             help="Name for the new node")
         parser.add_argument("file", metavar="FILE", nargs="?",
                             help="File in which the new node is defined")
-        parser.add_argument("line", metavar="LINE", nargs="?", type=int,
-                            help="Line in which the new node is defined")
 
     def run(self, args: argparse.Namespace) -> None:
-        if args.external and (args.file or args.line):
-            raise argparse.ArgumentError(None, "file/line not allowed for external symbols")
+        if args.external and args.file:
+            raise argparse.ArgumentError(None, "file not allowed for external symbols")
         if args.external:
             GRAPH.add_external_node(args.name)
         else:
-            GRAPH.add_node(args.name, file=args.file, line=args.line)
+            GRAPH.add_node(args.name, file=args.file)
 
 
 class EdgeCommand(VRCCommand):
@@ -380,8 +378,6 @@ class LabelCommand(VRCCommand):
                             help="The label to operate on")
         parser.add_argument("funcs", metavar="FUNCS", nargs="*",
                             help="The functions to be labeled, print currently labeled functions if absent")
-        parser.add_argument("--location", action="store_true",
-                            help="Print the nodes' file and line number.")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
@@ -394,7 +390,7 @@ class LabelCommand(VRCCommand):
                 GRAPH.add_label(f, args.label)
         else:
             for f in GRAPH.labeled_nodes(args.label):
-                print(GRAPH[f].format(args.location))
+                print(f)
 
 
 class ResetCommand(VRCCommand):
@@ -427,8 +423,6 @@ class CallersCommand(VRCCommand):
                             help="Include references to functions.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
-        parser.add_argument("--location", action="store_true",
-                            help="Print the nodes' file and line number.")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
@@ -442,7 +436,7 @@ class CallersCommand(VRCCommand):
                 result[i].append(f)
 
         for caller, callees in result.items():
-            print(f"{', '.join(callees)} <- {GRAPH[caller].format(args.location)}")
+            print(f"{', '.join(callees)} <- {caller}")
 
 
 class CalleesCommand(VRCCommand):
@@ -457,8 +451,6 @@ class CalleesCommand(VRCCommand):
                             help="Include references to functions.")
         parser.add_argument("funcs", metavar="FUNC", nargs="+",
                             help="The functions to be filtered")
-        parser.add_argument("--location", action="store_true",
-                            help="Print the nodes' file and line number.")
 
     @classmethod
     def get_completer(cls, nwords: int) -> Completer:
@@ -472,7 +464,7 @@ class CalleesCommand(VRCCommand):
                 result[i].append(f)
 
         for callee, callers in result.items():
-            print(f"{GRAPH[callee].format(args.location)} <- {', '.join(callers)}")
+            print(f"{callee} <- {', '.join(callers)}")
 
 
 class LabelsCommand(VRCCommand):
@@ -604,8 +596,6 @@ class PathsCommand(VRCCommand):
                             help="Include references to functions.")
         parser.add_argument("--limit", type=VRCCommand.positive_int,
                             help="Number of paths to print.")
-        parser.add_argument("--location", action="store_true",
-                            help="Print the nodes' file and line number.")
         parser.add_argument("expr", metavar="EXPR", nargs="+")
 
     def run(self, args: argparse.Namespace) -> None:
@@ -614,7 +604,7 @@ class PathsCommand(VRCCommand):
         n = 0
         try:
             for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
-                print(" <- ".join(GRAPH[f].format(args.location) for f in path))
+                print(" <- ".join(path))
                 n += 1
                 if n == args.limit:
                     break

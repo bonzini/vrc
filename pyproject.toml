@@ -12,7 +12,8 @@ authors = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-  "compynator"
+  "compynator",
+  "typing-extensions"
 ]
 
 [project.scripts]
