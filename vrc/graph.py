@@ -9,176 +9,146 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-from collections import defaultdict
-import dataclasses
-import os
+import abc
 import typing
+import typing_extensions
 
+from . import python_graph
+from .python_graph import Node
 from .util import Path
 from .automata import Automaton
 
 
-@dataclasses.dataclass
-class Node:
-    name: str
-    callers: set[str]
-    callees: dict[str, str]
-    username: typing.Optional[str] = None
-    file: typing.Optional[str] = None
-    line: typing.Optional[int] = None
-    external: bool = True
-
-    def __init__(self, name: str) -> None:
-        super().__init__()
-        self.name = name
-        self.callers = set()
-        self.callees = dict()
-
-    def format(self, include_location: bool) -> str:
-        n = self.username or self.name
-        if not include_location or self.file is None:
-            return f"{n}"
-        file = os.path.relpath(self.file)
-        if self.line is None:
-            return f"{n} ({file})"
-        else:
-            return f"{n} ({file}:{self.line})"
-
-    def __hash__(self) -> int:
-        return id(self)
-
-    def __getitem__(self, callee: str) -> str:
-        return self.callees[callee]
-
-    def __setitem__(self, callee: str, type: str) -> None:
-        # A "ref" edge does not override a "call" edge
-        if type == "call" or callee not in self.callees:
-            self.callees[callee] = type
-
-
-class Graph:
-    nodes: dict[str, Node]
-    nodes_by_username: dict[str, Node]
-    nodes_by_file: dict[str, list[str]]
+class GraphMixin(metaclass=abc.ABCMeta):
     keep: typing.Optional[set[str]]
     omitted: set[str]
     omitting_callers: set[str]    # Edges directed to these nodes are ignored
     omitting_callees: set[str]    # Edges starting from these nodes are ignored
-    node_labels: dict[str, set[str]]
     filter_default: bool
 
     def __init__(self) -> None:
-        self.nodes = {}
-        self.nodes_by_username = {}
-        self.nodes_by_file = defaultdict(lambda: list())
-
+        super().__init__()
         self.reset_filter()
-        self.reset_labels()
 
+    @abc.abstractmethod
     def add_external_node(self, name: str) -> None:
-        if name not in self.nodes:
-            self.nodes[name] = Node(name=name)
+        pass
 
+    @abc.abstractmethod
     def add_node(self, name: str, username: typing.Optional[str] = None,
                  file: typing.Optional[str] = None,
                  line: typing.Optional[int] = None) -> None:
-        self.add_external_node(name)
-        node = self.nodes[name]
-        if node.external:
-            # This is now a defined node.  It might have a username and a file
-            node.username = username
-            node.file = file
-            node.line = line
-            node.external = False
-            if username:
-                self.nodes_by_username[username] = node
-            if file:
-                self.nodes_by_file[file].append(name)
+        pass
 
+    @abc.abstractmethod
     def add_edge(self, caller: str, callee: str, type: str) -> None:
-        # The caller must exist, but the callee could be external.
-        self.add_external_node(callee)
-        self.nodes[caller][callee] = type
-        self.nodes[callee].callers.add(caller)
+        pass
 
+    @abc.abstractmethod
+    def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[Node, str]]:
+        pass
+
+    @abc.abstractmethod
     def get_node(self, name: str) -> typing.Optional[Node]:
-        if name in self.nodes_by_username:
-            return self.nodes_by_username[name]
-        elif name in self.nodes:
-            return self.nodes[name]
-        else:
-            return None
+        pass
 
-    def has_node(self, name: str) -> bool:
-        return bool(self.get_node(name))
-
+    @abc.abstractmethod
     def is_node_external(self, name: str) -> bool:
-        node = self.get_node(name)
-        return bool(node and node.external)
+        pass
 
+    @abc.abstractmethod
     def edge_type(self, src: str, dest: str) -> str:
-        srcnode = self.get_node(src)
-        dstnode = self.get_node(dest)
-        assert srcnode and dstnode
-        return srcnode[dstnode.name]
+        pass
+
+    @abc.abstractmethod
+    def all_files(self) -> typing.Iterator[str]:
+        pass
+
+    @abc.abstractmethod
+    def _all_nodes(self) -> typing.Iterator[str]:
+        pass
+
+    @abc.abstractmethod
+    def _all_nodes_for_file(self, file: str) -> typing.Iterator[str]:
+        pass
+
+    @abc.abstractmethod
+    def name(self, x: str) -> str:
+        pass
+
+    @abc.abstractmethod
+    def labels(self) -> typing.Iterable[str]:
+        pass
+
+    @abc.abstractmethod
+    def labeled_nodes(self, label: str) -> typing.Iterable[str]:
+        pass
+
+    @abc.abstractmethod
+    def add_label(self, node: str, label: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def has_label(self, node: str, label: str) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def reset_labels(self) -> None:
+        pass
 
     def _visit(self, start: str, targets: typing.Callable[[Node], typing.Iterable[str]]) -> typing.Iterator[str]:
         visited = set()
 
         def visit(n: Node) -> typing.Iterator[str]:
-            if n.name in visited:
-                return
-            visited.add(n.name)
-            yield n.username or n.name
             for caller in targets(n):
-                target = self.get_node(caller)
-                if target:
+                target, name = self._get_node(caller)
+                if target and target.name not in visited:
+                    assert name is not None
+                    visited.add(target.name)
+                    yield name
                     yield from visit(target)
 
-        n = self.get_node(start)
+        n, name = self._get_node(start)
         if not n:
             return iter({})
+        assert name is not None
+        yield name
         yield from visit(n)
 
     def all_callers(self, callee: str) -> typing.Iterator[str]:
-        return self._visit(callee, lambda n: n.callers)
+        return self._visit(callee, Node._get_caller_names)
 
     def all_callees(self, caller: str) -> typing.Iterator[str]:
-        return self._visit(caller, lambda n: n.callees.keys())
+        return self._visit(caller, Node._get_callee_names)
 
     def callers(self, callee: str, ref_ok: bool) -> typing.Iterator[str]:
-        n = self.get_node(callee)
+        n, _ = self._get_node(callee)
         if not n:
             return iter([])
         return (
             self.name(caller)
-            for caller in n.callers
+            for caller in n._get_caller_names()
             if self.filter_node(caller, True) and self.filter_edge(caller, callee, ref_ok))
 
     def callees(self, caller: str, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
-        n = self.get_node(caller)
+        n, _ = self._get_node(caller)
         if not n:
             return iter([])
         return (self.name(callee)
-                for callee in n.callees.keys()
+                for callee in n._get_callee_names()
                 if self.filter_node(callee, external_ok) and self.filter_edge(caller, callee, ref_ok))
 
-    def all_files(self) -> typing.Iterator[str]:
-        return iter(self.nodes_by_file.keys())
+    def has_node(self, name: str) -> bool:
+        return bool(self.get_node(name))
 
     def all_nodes(self, external_ok: bool) -> typing.Iterator[str]:
         return (self.name(x)
-                for x in self.nodes.keys()
+                for x in self._all_nodes()
                 if self.filter_node(x, external_ok))
 
     def all_nodes_for_file(self, file: str) -> typing.Iterator[str]:
         return (self.name(x)
-                for x in self.nodes_by_file[file]
-                if self.filter_node(x, False))
-
-    def name(self, x: str) -> str:
-        n = self.nodes[x]
-        return n.username or x
+                for x in self._all_nodes_for_file(file))
 
     def _filter_node(self, n: Node, external_ok: bool) -> bool:
         if not external_ok and n.external:
@@ -190,7 +160,7 @@ class Graph:
         return self.filter_default
 
     def filter_node(self, x: str, external_ok: bool) -> bool:
-        n = self.get_node(x)
+        n, _ = self._get_node(x)
         if not n:
             return False
         return self._filter_node(n, external_ok)
@@ -203,14 +173,14 @@ class Graph:
         return caller_node[callee_node.name] == "call" or (ref_ok and not callee_node.external)
 
     def filter_edge(self, caller: str, callee: str, ref_ok: bool) -> bool:
-        caller_node = self.get_node(caller)
-        callee_node = self.get_node(callee)
+        caller_node, _ = self._get_node(caller)
+        callee_node, _ = self._get_node(callee)
         if not caller_node or not callee_node:
             return False
         return self._filter_edge(caller_node, callee_node, ref_ok)
 
     def omit_node(self, name: str) -> None:
-        n = self.get_node(name)
+        n, _ = self._get_node(name)
         name = n.name if n else name
 
         self.omitted.add(name)
@@ -229,51 +199,35 @@ class Graph:
         self.omit_node(name)
 
     def omit_callers(self, name: str) -> None:
-        n = self.get_node(name)
+        n, _ = self._get_node(name)
         name = n.name if n else name
 
         self.omitting_callers.add(name)
         self._check_node_visibility(name)
         if n:
-            for caller in n.callers:
+            for caller in n._get_caller_names():
                 self._check_node_visibility(caller)
 
     def omit_callees(self, name: str) -> None:
-        n = self.get_node(name)
+        n, _ = self._get_node(name)
         name = n.name if n else name
 
         self.omitting_callees.add(name)
         self._check_node_visibility(name)
         if n:
-            for callee in n.callees:
+            for callee in n._get_callee_names():
                 self._check_node_visibility(callee)
 
     def keep_node(self, name: str) -> None:
         if self.keep is None:
             self.keep = set()
 
-        n = self.get_node(name)
+        n, _ = self._get_node(name)
         name = n.name if n else name
 
         self.keep.add(name)
         if name in self.omitted:
             self.omitted.remove(name)
-
-    def labels(self) -> typing.Iterable[str]:
-        return self.node_labels.keys()
-
-    def labeled_nodes(self, label: str) -> typing.Iterable[str]:
-        return self.node_labels[label]
-
-    def add_label(self, node: str, label: str) -> None:
-        self.node_labels[label].add(node)
-
-    def has_label(self, node: str, label: str) -> bool:
-        # check label first to avoid associating the key with an empty set
-        return (label in self.node_labels) and (node in self.node_labels[label])
-
-    def reset_labels(self) -> None:
-        self.node_labels = defaultdict(lambda: set())
 
     def paths(self, a: Automaton[typing.Any], external_ok: bool,
               ref_ok: bool) -> typing.Iterable[typing.Iterable[str]]:
@@ -284,8 +238,8 @@ class Graph:
         def visit(caller: typing.Optional[Node], nodes: typing.Iterable[str],
                   state: typing.Any) -> typing.Iterable[typing.Iterable[str]]:
             for target in nodes:
-                node = self.get_node(target)
-                assert node is not None
+                node, name = self._get_node(target)
+                assert node is not None and name is not None
                 if node in visited:
                     continue
                 if caller and not self._filter_edge(caller, node, ref_ok):
@@ -299,17 +253,16 @@ class Graph:
                         continue
                     valid.add(node)
 
-                name = node.username or node.name
                 next_state = a.advance(state, name)
                 if not a.is_failure(next_state):
                     path.append(name)
                     if a.is_final(next_state):
                         yield path
-                    yield from visit(node, node.callees.keys(), next_state)
+                    yield from visit(node, node._get_callee_names(), next_state)
                     path.pop()
                 visited.remove(node)
 
-        yield from visit(None, self.nodes.keys(), a.initial())
+        yield from visit(None, self.all_nodes(external_ok), a.initial())
 
     def reset_filter(self) -> None:
         self.omitted = set()
@@ -318,9 +271,16 @@ class Graph:
         self.keep = None
         self.filter_default = True
 
-    """Like get_node(), but fails if no such node exists."""
     def __getitem__(self, name: str) -> Node:
+        """Like get_node(), but fails if no such node exists."""
         node = self.get_node(name)
         if node is None:
             raise IndexError
         return node
+
+
+class PythonGraph(python_graph.Graph, GraphMixin):
+    pass
+
+
+Graph: typing_extensions.TypeAlias = PythonGraph

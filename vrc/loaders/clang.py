@@ -127,8 +127,7 @@ class ClangCIndexLoader(ClangLoader):
                 current_function = c.spelling
                 if c.is_definition():
                     self.verbose_print(f"{fn}: found function definition {current_function}")
-                    loc = c.location
-                    file_graph.add_node(current_function, file=loc.file.name, line=loc.line)
+                    file_graph.add_node(current_function)
                     visit(c, visit_function_body)
                 else:
                     self.verbose_print(f"{fn}: found function declaration {current_function}")
