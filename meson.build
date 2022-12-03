@@ -1,5 +1,5 @@
 project('vrc', [], version: files('VERSION'),
-        default_options: ['optimization=2', 'debug=true'])
+        default_options: ['optimization=2', 'debug=true', 'cpp_std=gnu++20'])
 
 fs = import('fs')
 py_mod = import('python')
@@ -26,7 +26,8 @@ srcfiles = [
 ]
 
 pure = true
-if add_languages('c', 'cython', required: false) and py_dep.found()
+if add_languages('c', 'cython', required: false) and py_dep.found() \
+  and add_languages('cpp', required: false)
   subdir('vrc')
   pure = false
 endif

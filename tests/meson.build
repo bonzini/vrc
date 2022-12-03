@@ -31,3 +31,11 @@ test('flake8', find_program('flake8'), args: pyfiles,
 test('mypy', find_program('mypy'), args: [ '-p', 'vrc', '-p', 'tests' ],
      env: testenv,
      workdir: meson.project_source_root())
+
+cpptests = [
+  'conc_array_test'
+]
+
+foreach t: cpptests
+  test(t, executable(t, t + '.cc', dependencies: conc))
+endforeach
