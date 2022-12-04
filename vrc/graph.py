@@ -349,3 +349,13 @@ class PythonGraph(python_graph.Graph, GraphMixin):
 
 
 Graph: typing_extensions.TypeAlias = PythonGraph
+if not typing.TYPE_CHECKING:
+    try:
+        from . import cython_graph
+
+        class CythonGraph(cython_graph.Graph, GraphMixin):
+            pass
+
+        Graph = CythonGraph
+    except ImportError:
+        pass

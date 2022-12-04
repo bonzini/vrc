@@ -18,4 +18,3 @@ py.extension_module(
   subdir: 'vrc/loaders',
   install: true,
 )
-pure = false
