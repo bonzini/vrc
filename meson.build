@@ -26,7 +26,8 @@ srcfiles = [
 
 pure = true
 if add_languages('c', 'cython', required: false) and py_dep.found()
-  subdir('vrc/loaders')
+  subdir('vrc')
+  pure = false
 endif
 
 # use a loop to emulate preserve_path: true (added in 0.64)
