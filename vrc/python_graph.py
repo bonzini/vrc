@@ -41,14 +41,6 @@ class Node:
         else:
             return f"{n} ({file}:{self.line})"
 
-    def __getitem__(self, callee: int) -> bool:
-        return self.callees.get(callee, False)
-
-    def __setitem__(self, callee: int, is_call: bool) -> None:
-        # A "ref" edge does not override a "call" edge
-        if is_call or callee not in self.callees:
-            self.callees[callee] = is_call
-
 
 class Graph:
     nodes_by_index: list[Node]
@@ -96,7 +88,11 @@ class Graph:
                 self.nodes_by_file[file].append(i)
 
     def _add_edge(self, i: int, j: int, is_call: bool) -> None:
-        self.nodes_by_index[i][j] = is_call
+        src = self.nodes_by_index[i]
+        # A "ref" edge does not override a "call" edge
+        if is_call or j not in src.callees:
+            src.callees[j] = is_call
+
         self.nodes_by_index[j].callers.add(i)
 
     def node_count(self) -> int:
@@ -130,12 +126,15 @@ class Graph:
         return self.nodes_by_index[i].external
 
     def _has_edge(self, src: int, dest: int, ref_ok: bool) -> bool:
-        if self.nodes_by_index[src][dest]:
-            return True
+        e = self.nodes_by_index[src].callees.get(dest, None)
+        if e is not False:
+            # nonexistant or call edge
+            return e is True
+        # ref edge
         return ref_ok and not self.nodes_by_index[dest].external
 
     def _has_call_edge(self, src: int, dest: int) -> bool:
-        return self.nodes_by_index[src][dest]
+        return self.nodes_by_index[src].callees.get(dest, False)
 
     def all_files(self) -> typing.Iterable[str]:
         return iter(self.nodes_by_file.keys())
