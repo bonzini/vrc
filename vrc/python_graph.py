@@ -18,8 +18,8 @@ import typing
 @dataclasses.dataclass
 class Node:
     name: str
-    callers: set[str]
-    callees: dict[str, str]
+    callers: set[int]
+    callees: dict[int, bool]
     username: typing.Optional[str] = None
     file: typing.Optional[str] = None
     line: typing.Optional[int] = None
@@ -41,47 +41,49 @@ class Node:
         else:
             return f"{n} ({file}:{self.line})"
 
-    def __hash__(self) -> int:
-        return id(self)
+    def __getitem__(self, callee: int) -> bool:
+        return self.callees.get(callee, False)
 
-    def __getitem__(self, callee: str) -> str:
-        return self.callees[callee]
-
-    def __setitem__(self, callee: str, type: str) -> None:
+    def __setitem__(self, callee: int, is_call: bool) -> None:
         # A "ref" edge does not override a "call" edge
-        if type == "call" or callee not in self.callees:
-            self.callees[callee] = type
-
-    def _get_caller_names(self) -> typing.Iterable[str]:
-        return self.callers
-
-    def _get_callee_names(self) -> typing.Iterable[str]:
-        return self.callees.keys()
+        if is_call or callee not in self.callees:
+            self.callees[callee] = is_call
 
 
 class Graph:
-    nodes: dict[str, Node]
-    nodes_by_username: dict[str, Node]
-    nodes_by_file: dict[str, list[str]]
-    node_labels: dict[str, set[str]]
+    nodes_by_index: list[Node]
+    nodes: dict[str, int]
+    nodes_by_username: dict[str, int]
+    nodes_by_file: dict[str, list[int]]
+    node_labels: dict[str, set[int]]
 
     def __init__(self) -> None:
         super().__init__()
+        self.nodes_by_index = []
         self.nodes = {}
         self.nodes_by_username = {}
         self.nodes_by_file = defaultdict(lambda: list())
 
         self.reset_labels()
 
-    def add_external_node(self, name: str) -> None:
-        if name not in self.nodes:
-            self.nodes[name] = Node(name=name)
+    def add_external_node(self, name: str) -> int:
+        i = self.nodes_by_username.get(name, None)
+        if i is not None:
+            return i
 
-    def add_node(self, name: str, username: typing.Optional[str] = None,
-                 file: typing.Optional[str] = None,
-                 line: typing.Optional[int] = None) -> None:
-        self.add_external_node(name)
-        node = self.nodes[name]
+        i = self.nodes.get(name, None)
+        if i is not None:
+            return i
+
+        i = len(self.nodes_by_index)
+        self.nodes[name] = i
+        self.nodes_by_index.append(Node(name=name))
+        return i
+
+    def _add_node(self, i: int, username: typing.Optional[str] = None,
+                  file: typing.Optional[str] = None,
+                  line: typing.Optional[int] = None) -> None:
+        node = self.nodes_by_index[i]
         if node.external:
             # This is now a defined node.  It might have a username and a file
             node.username = username
@@ -89,64 +91,76 @@ class Graph:
             node.line = line
             node.external = False
             if username:
-                self.nodes_by_username[username] = node
+                self.nodes_by_username[username] = i
             if file:
-                self.nodes_by_file[file].append(name)
+                self.nodes_by_file[file].append(i)
 
-    def add_edge(self, caller: str, callee: str, type: str) -> None:
-        # The caller must exist, but the callee could be external.
-        self.add_external_node(callee)
-        self.nodes[caller][callee] = type
-        self.nodes[callee].callers.add(caller)
+    def _add_edge(self, i: int, j: int, is_call: bool) -> None:
+        self.nodes_by_index[i][j] = is_call
+        self.nodes_by_index[j].callers.add(i)
 
-    def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[Node, str]]:
-        if name in self.nodes_by_username:
-            return self.nodes_by_username[name], name
-        elif name in self.nodes:
-            node = self.nodes[name]
-            return node, node.username or name
-        else:
-            return None, None
+    def node_count(self) -> int:
+        return len(self.nodes_by_index)
 
-    def get_node(self, name: str) -> typing.Optional[Node]:
-        n, _ = self._get_node(name)
-        return n
+    def _node_by_index(self, i: int) -> Node:
+        return self.nodes_by_index[i]
 
-    def is_node_external(self, name: str) -> bool:
-        node, _ = self._get_node(name)
-        return bool(node and node.external)
+    def _name_by_index(self, i: int) -> str:
+        node = self.nodes_by_index[i]
+        return node.username or node.name
 
-    def edge_type(self, src: str, dest: str) -> str:
-        srcnode, srcname = self._get_node(src)
-        dstnode, dstname = self._get_node(dest)
-        assert srcnode and dstnode
-        return srcnode[dstnode.name]
+    def _get_callers(self, i: int) -> typing.Iterable[int]:
+        return self.nodes_by_index[i].callers
 
-    def all_files(self) -> typing.Iterator[str]:
+    def _get_callees(self, i: int) -> typing.Iterable[int]:
+        return self.nodes_by_index[i].callees.keys()
+
+    def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[int, str]]:
+        i = self.nodes_by_username.get(name, None)
+        if i is not None:
+            return i, name
+
+        i = self.nodes.get(name, None)
+        if i is not None:
+            node = self.nodes_by_index[i]
+            return i, node.username or name
+        return None, None
+
+    def _is_node_external(self, i: int) -> bool:
+        return self.nodes_by_index[i].external
+
+    def _has_edge(self, src: int, dest: int, ref_ok: bool) -> bool:
+        if self.nodes_by_index[src][dest]:
+            return True
+        return ref_ok and not self.nodes_by_index[dest].external
+
+    def _has_call_edge(self, src: int, dest: int) -> bool:
+        return self.nodes_by_index[src][dest]
+
+    def all_files(self) -> typing.Iterable[str]:
         return iter(self.nodes_by_file.keys())
 
-    def _all_nodes(self) -> typing.Iterator[str]:
-        return iter(self.nodes.keys())
+    def _all_nodes(self) -> typing.Iterable[int]:
+        return range(0, self.node_count())
 
-    def _all_nodes_for_file(self, file: str) -> typing.Iterator[str]:
-        return iter(self.nodes_by_file[file])
+    def _all_nodes_for_file(self, file: str) -> typing.Iterable[int]:
+        return self.nodes_by_file[file]
 
     def name(self, x: str) -> str:
-        n = self.nodes[x]
+        n = self.nodes_by_index[self.nodes[x]]
         return n.username or x
 
     def labels(self) -> typing.Iterable[str]:
         return self.node_labels.keys()
 
-    def labeled_nodes(self, label: str) -> typing.Iterable[str]:
+    def _all_nodes_for_label(self, label: str) -> typing.Iterable[int]:
         return self.node_labels[label]
 
-    def add_label(self, node: str, label: str) -> None:
-        self.node_labels[label].add(node)
+    def _add_label(self, i: int, label: str) -> None:
+        self.node_labels[label].add(i)
 
-    def has_label(self, node: str, label: str) -> bool:
-        # check label first to avoid associating the key with an empty set
-        return (label in self.node_labels) and (node in self.node_labels[label])
+    def _has_label(self, i: int, label: str) -> bool:
+        return (label in self.node_labels) and (i in self.node_labels[label])
 
     def reset_labels(self) -> None:
         self.node_labels = defaultdict(lambda: set())
