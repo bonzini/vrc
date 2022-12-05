@@ -9,6 +9,7 @@ using std::size_t;
 
 static std::mutex threads_lock;
 static std::vector<RCUThread *> threads;
+RCUThread gil_rcu;
 
 std::atomic<std::size_t> RCUThread::rcu_gp{1};
 std::binary_semaphore RCUThread::wake{1};

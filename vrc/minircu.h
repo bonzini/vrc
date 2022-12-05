@@ -66,6 +66,8 @@ public:
     friend void synchronize_rcu();
 };
 
+extern RCUThread gil_rcu;
+
 template<typename T>
 class RCUPtr {
 public:
