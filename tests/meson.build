@@ -33,7 +33,8 @@ test('mypy', find_program('mypy'), args: [ '-p', 'vrc', '-p', 'tests' ],
      workdir: meson.project_source_root())
 
 cpptests = [
-  'conc_array_test'
+  'conc_array_test',
+  'conc_set_test',
 ]
 
 foreach t: cpptests
