@@ -35,6 +35,7 @@ test('mypy', find_program('mypy'), args: [ '-p', 'vrc', '-p', 'tests' ],
 cpptests = [
   'conc_array_test',
   'conc_set_test',
+  'conc_map_test',
 ]
 
 foreach t: cpptests
