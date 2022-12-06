@@ -96,7 +96,7 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
     case CXCursor_CallExpr:
         {
             CXCursor target = clang_getCursorReferenced(c);
-            if (target.kind) {
+            if (!clang_isInvalid(target.kind)) {
                 add_edge(state, target, true);
             }
         }
@@ -105,7 +105,7 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
     case CXCursor_FunctionDecl:
         {
             CXCursor target = clang_getCursorReferenced(c);
-            if (target.kind) {
+            if (!clang_isInvalid(target.kind)) {
                 add_edge(state, target, false);
             }
         }
