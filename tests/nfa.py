@@ -1,11 +1,11 @@
 import typing
-import unittest
+
 from vrc.automata.nfa import NFA
 from vrc.automata import Automaton
 from vrc.automata.regex import Empty, One, Sequence, Star, Alt
 
 
-class NFATest(unittest.TestCase):
+class TestNFA:
     @staticmethod
     def sample_nfa() -> NFA:
         """Return an NFA for ``(A.)*|B``."""
@@ -28,27 +28,27 @@ class NFATest(unittest.TestCase):
 
     def sample_visit(self, a: Automaton[typing.Any]) -> None:
         v = a.visit()
-        self.assertFalse(v.success())
+        assert not v.success()
         v.visit("A")
-        self.assertFalse(v.success())
+        assert not v.success()
         v.visit("X")
-        self.assertTrue(v.success())
+        assert v.success()
         v.visit("A")
-        self.assertFalse(v.success())
+        assert not v.success()
         v.visit("Y")
-        self.assertTrue(v.success())
+        assert v.success()
         v = a.visit()
         v.visit("B")
-        self.assertTrue(v.success())
+        assert v.success()
         v.visit("A")
-        self.assertFalse(v.success())
+        assert not v.success()
 
     def test_empty(self) -> None:
         a = NFA()
         v = a.visit()
-        self.assertFalse(v.success())
+        assert not v.success()
         v.visit("A")
-        self.assertFalse(v.success())
+        assert not v.success()
 
     def test_nfa(self) -> None:
         nfa = self.sample_nfa()
@@ -56,11 +56,11 @@ class NFATest(unittest.TestCase):
 
     def test_matches(self) -> None:
         nfa = self.sample_nfa()
-        self.assertTrue(nfa.matches("AXAY"))
-        self.assertTrue(nfa.matches(["A", "foo"]))
-        self.assertTrue(nfa.matches(["B"]))
-        self.assertFalse(nfa.matches(["foo"]))
-        self.assertFalse(nfa.matches(["B", "A"]))
+        assert nfa.matches("AXAY")
+        assert nfa.matches(["A", "foo"])
+        assert nfa.matches(["B"])
+        assert not nfa.matches(["foo"])
+        assert not nfa.matches(["B", "A"])
 
     def test_lazy_dfa(self) -> None:
         dfa = self.sample_nfa().lazy_dfa()
@@ -69,77 +69,77 @@ class NFATest(unittest.TestCase):
     def test_empty_lazy_dfa(self) -> None:
         a = NFA().lazy_dfa()
         v = a.visit()
-        self.assertFalse(v.success())
+        assert not v.success()
         v.visit("A")
-        self.assertFalse(v.success())
+        assert not v.success()
 
 
-class RegexTest(unittest.TestCase):
+class TestRegex:
     def test_empty(self) -> None:
         nfa = Empty().nfa()
-        self.assertTrue(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
+        assert nfa.matches("")
+        assert not nfa.matches("a")
 
     def test_one(self) -> None:
         nfa = One("a".__eq__).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertFalse(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert nfa.matches("a")
+        assert not nfa.matches("b")
+        assert not nfa.matches("ab")
+        assert not nfa.matches("ba")
 
     def test_sequence(self) -> None:
         nfa = Sequence().nfa()
-        self.assertTrue(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
+        assert nfa.matches("")
+        assert not nfa.matches("a")
 
         nfa = Sequence(One("a".__eq__)).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertFalse(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert nfa.matches("a")
+        assert not nfa.matches("b")
+        assert not nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = Sequence(One("a".__eq__), Empty()).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertFalse(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert nfa.matches("a")
+        assert not nfa.matches("b")
+        assert not nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = Sequence(One("a".__eq__), One("b".__eq__)).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertTrue(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("b")
+        assert nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = Sequence(Empty(), One("a".__eq__), One("b".__eq__)).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertTrue(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("b")
+        assert nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = Sequence(One("a".__eq__), One(lambda x: True), One("c".__eq__)).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("ac"))
-        self.assertTrue(nfa.matches("abc"))
-        self.assertTrue(nfa.matches(["a", "foo", "c"]))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("ac")
+        assert nfa.matches("abc")
+        assert nfa.matches(["a", "foo", "c"])
 
     def test_alt(self) -> None:
         nfa = Alt(One("a".__eq__), One("b".__eq__)).nfa()
-        self.assertFalse(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertTrue(nfa.matches("b"))
-        self.assertFalse(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert nfa.matches("a")
+        assert nfa.matches("b")
+        assert not nfa.matches("ab")
+        assert not nfa.matches("ba")
 
     def test_star(self) -> None:
         nfa = Star(One("a".__eq__)).nfa()
-        self.assertTrue(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertTrue(nfa.matches("aaaaa"))
-        self.assertFalse(nfa.matches("baaaa"))
-        self.assertFalse(nfa.matches("aaaab"))
+        assert nfa.matches("")
+        assert nfa.matches("a")
+        assert nfa.matches("aaaaa")
+        assert not nfa.matches("baaaa")
+        assert not nfa.matches("aaaab")

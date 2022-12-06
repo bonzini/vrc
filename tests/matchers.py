@@ -1,5 +1,5 @@
 import typing
-import unittest
+
 from vrc.automata import Automaton
 from vrc.graph import Graph
 from vrc.matchers import (
@@ -28,13 +28,13 @@ def sample_graph() -> Graph:
     return g
 
 
-class MatcherTest(unittest.TestCase):
+class TestMatcher:
     def do_test(self, m: Matcher, results: list[str], g: Graph = sample_graph()) -> None:
-        self.assertEqual(sorted(list(m.match_nodes_in_graph(g))), sorted(results))
+        assert sorted(list(m.match_nodes_in_graph(g))) == sorted(results)
 
         c = m.as_callable(g)
         for node in g.all_nodes(True):
-            self.assertEqual(c(node), node in results)
+            assert c(node) == (node in results)
 
     def do_parse_test(self, s: str, results: list[str], g: Graph = sample_graph()) -> None:
         parse_result = parse_nodespec(s)
@@ -133,7 +133,7 @@ class MatcherTest(unittest.TestCase):
         self.do_parse_test('["b"]:callers ', ["a"])
 
 
-class RegexTest(unittest.TestCase):
+class TestRegex:
     @staticmethod
     def parse(s: str) -> Automaton[typing.Any]:
         g = Graph()
@@ -141,68 +141,68 @@ class RegexTest(unittest.TestCase):
 
     def test_one(self) -> None:
         nfa = self.parse("a")
-        self.assertFalse(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertFalse(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert nfa.matches("a")
+        assert not nfa.matches("b")
+        assert not nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = self.parse("foo")
-        self.assertFalse(nfa.matches("foo"))
-        self.assertTrue(nfa.matches(["foo"]))
+        assert not nfa.matches("foo")
+        assert nfa.matches(["foo"])
 
     def test_sequence(self) -> None:
         nfa = self.parse("a b")
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertTrue(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("b")
+        assert nfa.matches("ab")
+        assert not nfa.matches("ba")
 
         nfa = self.parse("a b c")
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("ac"))
-        self.assertTrue(nfa.matches("abc"))
-        self.assertFalse(nfa.matches(["abc"]))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("ac")
+        assert nfa.matches("abc")
+        assert not nfa.matches(["abc"])
 
         nfa = self.parse("a foo c")
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("ac"))
-        self.assertFalse(nfa.matches("afooc"))
-        self.assertTrue(nfa.matches(["a", "foo", "c"]))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("ac")
+        assert not nfa.matches("afooc")
+        assert nfa.matches(["a", "foo", "c"])
 
     def test_alt(self) -> None:
         nfa = self.parse("a b |c")
-        self.assertFalse(nfa.matches(""))
-        self.assertFalse(nfa.matches("a"))
-        self.assertFalse(nfa.matches("b"))
-        self.assertTrue(nfa.matches("ab"))
-        self.assertFalse(nfa.matches("ba"))
-        self.assertTrue(nfa.matches("c"))
+        assert not nfa.matches("")
+        assert not nfa.matches("a")
+        assert not nfa.matches("b")
+        assert nfa.matches("ab")
+        assert not nfa.matches("ba")
+        assert nfa.matches("c")
 
     def test_star(self) -> None:
         nfa = self.parse("a*")
-        self.assertTrue(nfa.matches(""))
-        self.assertTrue(nfa.matches("a"))
-        self.assertTrue(nfa.matches("aaaaa"))
-        self.assertFalse(nfa.matches("baaaa"))
-        self.assertFalse(nfa.matches("aaaab"))
+        assert nfa.matches("")
+        assert nfa.matches("a")
+        assert nfa.matches("aaaaa")
+        assert not nfa.matches("baaaa")
+        assert not nfa.matches("aaaab")
 
     def test_regex(self) -> None:
         nfa = self.parse("/^func_/")
-        self.assertFalse(nfa.matches([]))
-        self.assertTrue(nfa.matches(["func_a"]))
-        self.assertFalse(nfa.matches(["_func_a"]))
+        assert not nfa.matches([])
+        assert nfa.matches(["func_a"])
+        assert not nfa.matches(["_func_a"])
 
         nfa = self.parse("a /blah/ c")
-        self.assertFalse(nfa.matches("ablahc"))
-        self.assertTrue(nfa.matches(["a", "xblahy", "c"]))
+        assert not nfa.matches("ablahc")
+        assert nfa.matches(["a", "xblahy", "c"])
 
     def test_any(self) -> None:
         nfa = self.parse("a [] c")
         print(nfa)
-        self.assertFalse(nfa.matches(["a", "c"]))
-        self.assertTrue(nfa.matches(["a", "b", "c"]))
-        self.assertFalse(nfa.matches(["a", "b", "b", "c"]))
+        assert not nfa.matches(["a", "c"])
+        assert nfa.matches(["a", "b", "c"])
+        assert not nfa.matches(["a", "b", "b", "c"])
