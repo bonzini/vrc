@@ -1,6 +1,7 @@
 tests = [
   'conftest.py',
   'graph.py',
+  'graph_lowlevel.py',
   'matchers.py',
   'nfa.py',
 ]
