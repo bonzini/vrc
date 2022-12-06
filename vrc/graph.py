@@ -11,6 +11,7 @@
 
 from collections import defaultdict
 import dataclasses
+import os
 import typing
 
 from .util import Path
@@ -32,6 +33,16 @@ class Node:
         self.name = name
         self.callers = set()
         self.callees = dict()
+
+    def format(self, include_location: bool) -> str:
+        n = self.username or self.name
+        if not include_location or self.file is None:
+            return f"{n}"
+        file = os.path.relpath(self.file)
+        if self.line is None:
+            return f"{n} ({file})"
+        else:
+            return f"{n} ({file}:{self.line})"
 
     def __hash__(self) -> int:
         return id(self)
