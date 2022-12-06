@@ -1,5 +1,3 @@
-subdir('loaders')
-
 conc = declare_dependency(
   link_with: static_library('conc', 'minircu.cc'),
   include_directories: include_directories('.')
@@ -18,3 +16,5 @@ py.extension_module(
   subdir: 'vrc',
   install: true,
 )
+
+subdir('loaders')
