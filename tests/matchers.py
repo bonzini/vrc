@@ -1,15 +1,17 @@
+import pytest
 import typing
 
 from vrc.automata import Automaton
-from vrc.graph import Graph
+from vrc.graph import GraphMixin, PythonGraph
 from vrc.matchers import (
     Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot,
     MatchCallers, MatchCallees, parse_nodespec, parse_pathspec
 )
 
 
-def sample_graph() -> Graph:
-    g = Graph()
+@pytest.fixture
+def sample_graph(graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+    g = graph_class()
     g.add_node("a")
     g.add_node("b")
     g.add_node("func_a")
@@ -29,50 +31,50 @@ def sample_graph() -> Graph:
 
 
 class TestMatcher:
-    def do_test(self, m: Matcher, results: list[str], g: Graph = sample_graph()) -> None:
+    def do_test(self, g: GraphMixin, m: Matcher, results: list[str]) -> None:
         assert sorted(list(m.match_nodes_in_graph(g))) == sorted(results)
 
         c = m.as_callable(g)
         for node in g.all_nodes(True):
             assert c(node) == (node in results)
 
-    def do_parse_test(self, s: str, results: list[str], g: Graph = sample_graph()) -> None:
+    def do_parse_test(self, g: GraphMixin, s: str, results: list[str]) -> None:
         parse_result = parse_nodespec(s)
-        self.do_test(parse_result, results, g)
+        self.do_test(g, parse_result, results)
 
-    def test_by_name(self) -> None:
-        self.do_test(MatchByName("a"), ["a"])
-        self.do_test(MatchByName("blah"), [])
-        self.do_test(MatchByName("f(int, float)"), ["f(int, float)"])
+    def test_by_name(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchByName("a"), ["a"])
+        self.do_test(sample_graph, MatchByName("blah"), [])
+        self.do_test(sample_graph, MatchByName("f(int, float)"), ["f(int, float)"])
 
-    def test_by_regex(self) -> None:
-        self.do_test(MatchByRegex("a$"), ["a", "func_a"])
-        self.do_test(MatchByRegex("^func_"), ["func_a"])
+    def test_by_regex(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchByRegex("a$"), ["a", "func_a"])
+        self.do_test(sample_graph, MatchByRegex("^func_"), ["func_a"])
 
-    def test_label(self) -> None:
-        self.do_test(MatchLabel("L1"), ["l1", "l12"])
-        self.do_test(MatchLabel("L2"), ["l2", "l12"])
-        self.do_test(MatchLabel("L3"), [])
+    def test_label(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchLabel("L1"), ["l1", "l12"])
+        self.do_test(sample_graph, MatchLabel("L2"), ["l2", "l12"])
+        self.do_test(sample_graph, MatchLabel("L3"), [])
 
-    def test_and(self) -> None:
-        self.do_test(MatchAnd(), ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
-        self.do_test(MatchAnd(MatchLabel("L1"), MatchLabel("L2")), ["l12"])
+    def test_and(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchAnd(), ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
+        self.do_test(sample_graph, MatchAnd(MatchLabel("L1"), MatchLabel("L2")), ["l12"])
 
-    def test_not(self) -> None:
-        self.do_test(MatchNot(MatchAnd()), [])
-        self.do_test(MatchNot(MatchLabel("L1")), ["a", "b", "f(int, float)", "func_a", "l2"])
-        self.do_test(MatchAnd(MatchNot(MatchLabel("L1")), MatchNot(MatchLabel("L2"))), ["a", "b", "f(int, float)", "func_a"])
-        self.do_test(MatchNot(MatchOr(MatchLabel("L1"), MatchLabel("L2"))), ["a", "b", "f(int, float)", "func_a"])
+    def test_not(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchNot(MatchAnd()), [])
+        self.do_test(sample_graph, MatchNot(MatchLabel("L1")), ["a", "b", "f(int, float)", "func_a", "l2"])
+        self.do_test(sample_graph, MatchAnd(MatchNot(MatchLabel("L1")), MatchNot(MatchLabel("L2"))), ["a", "b", "f(int, float)", "func_a"])
+        self.do_test(sample_graph, MatchNot(MatchOr(MatchLabel("L1"), MatchLabel("L2"))), ["a", "b", "f(int, float)", "func_a"])
 
-    def test_or(self) -> None:
-        self.do_test(MatchOr(), [])
-        self.do_test(MatchOr(MatchLabel("L1"), MatchByName("l2")), ["l1", "l2", "l12"])
+    def test_or(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchOr(), [])
+        self.do_test(sample_graph, MatchOr(MatchLabel("L1"), MatchByName("l2")), ["l1", "l2", "l12"])
 
-    def test_callers(self) -> None:
-        self.do_test(MatchCallers(MatchByName("b")), ["a"])
+    def test_callers(self, sample_graph: GraphMixin) -> None:
+        self.do_test(sample_graph, MatchCallers(MatchByName("b")), ["a"])
 
-    def test_callees(self) -> None:
-        g = Graph()
+    def test_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
+        g = graph_class()
         g.add_node("a")
         g.add_node("b")
         g.add_node("c")
@@ -87,56 +89,56 @@ class TestMatcher:
         g.add_edge("d", "e", "call")
 
         not_co = MatchNot(MatchLabel("CO"))
-        self.do_test(not_co, ["b", "d", "e"], g)
-        self.do_parse_test("[!CO]", ["b", "d", "e"], g)
+        self.do_test(g, not_co, ["b", "d", "e"])
+        self.do_parse_test(g, "[!CO]", ["b", "d", "e"])
 
         co_callees = MatchCallees(MatchLabel("CO"))
-        self.do_test(co_callees, ["b", "c", "d"], g)
-        self.do_parse_test("[CO:callees]", ["b", "c", "d"], g)
+        self.do_test(g, co_callees, ["b", "c", "d"])
+        self.do_parse_test(g, "[CO:callees]", ["b", "c", "d"])
 
         not_co_callees = MatchCallees(MatchNot(MatchLabel("CO")))
-        self.do_test(not_co_callees, ["c", "e"], g)
-        self.do_parse_test("[!CO:callees]", ["c", "e"], g)
+        self.do_test(g, not_co_callees, ["c", "e"])
+        self.do_parse_test(g, "[!CO:callees]", ["c", "e"])
 
         co_candidate = MatchAnd(not_co, co_callees, MatchNot(not_co_callees))
-        self.do_test(co_candidate, ["b", "d"], g)
-        self.do_parse_test("[!CO,CO:callees,![!CO:callees]]", ["b", "d"], g)
+        self.do_test(g, co_candidate, ["b", "d"])
+        self.do_parse_test(g, "[!CO,CO:callees,![!CO:callees]]", ["b", "d"])
 
-    def test_parsers(self) -> None:
-        self.do_parse_test("a", ["a"])
-        self.do_parse_test("blah", [])
-        self.do_parse_test("[]", ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
-        self.do_parse_test("[L1,L2]", ["l12"])
-        self.do_parse_test("[L1|L2]", ["l1", "l2", "l12"])
-        self.do_parse_test("![L1|L2]", ["a", "b", "f(int, float)", "func_a"])
-        self.do_parse_test("[!L1,!L2]", ["a", "b", "f(int, float)", "func_a"])
-        self.do_parse_test("/^func_/", ["func_a"])
-        self.do_parse_test('[/^f/,!"func_a"]', ["f(int, float)"])
-        self.do_parse_test('"f(int, float)"', ["f(int, float)"])
+    def test_parsers(self, sample_graph: GraphMixin) -> None:
+        self.do_parse_test(sample_graph, "a", ["a"])
+        self.do_parse_test(sample_graph, "blah", [])
+        self.do_parse_test(sample_graph, "[]", ["a", "b", "f(int, float)", "func_a", "l1", "l2", "l12"])
+        self.do_parse_test(sample_graph, "[L1,L2]", ["l12"])
+        self.do_parse_test(sample_graph, "[L1|L2]", ["l1", "l2", "l12"])
+        self.do_parse_test(sample_graph, "![L1|L2]", ["a", "b", "f(int, float)", "func_a"])
+        self.do_parse_test(sample_graph, "[!L1,!L2]", ["a", "b", "f(int, float)", "func_a"])
+        self.do_parse_test(sample_graph, "/^func_/", ["func_a"])
+        self.do_parse_test(sample_graph, '[/^f/,!"func_a"]', ["f(int, float)"])
+        self.do_parse_test(sample_graph, '"f(int, float)"', ["f(int, float)"])
 
-        self.do_parse_test('b:callers', ["a"])
-        self.do_parse_test('["b":callers]', ["a"])
-        self.do_parse_test('["b"]:callers', ["a"])
+        self.do_parse_test(sample_graph, 'b:callers', ["a"])
+        self.do_parse_test(sample_graph, '["b":callers]', ["a"])
+        self.do_parse_test(sample_graph, '["b"]:callers', ["a"])
 
-    def test_spaces(self) -> None:
-        self.do_parse_test(" [L1,L2]", ["l12"])
-        self.do_parse_test("[ L1,L2]", ["l12"])
-        self.do_parse_test("[L1 ,L2]", ["l12"])
-        self.do_parse_test("[L1, L2]", ["l12"])
-        self.do_parse_test("[L1,L2 ]", ["l12"])
-        self.do_parse_test("[L1,L2] ", ["l12"])
+    def test_spaces(self, sample_graph: GraphMixin) -> None:
+        self.do_parse_test(sample_graph, " [L1,L2]", ["l12"])
+        self.do_parse_test(sample_graph, "[ L1,L2]", ["l12"])
+        self.do_parse_test(sample_graph, "[L1 ,L2]", ["l12"])
+        self.do_parse_test(sample_graph, "[L1, L2]", ["l12"])
+        self.do_parse_test(sample_graph, "[L1,L2 ]", ["l12"])
+        self.do_parse_test(sample_graph, "[L1,L2] ", ["l12"])
 
-        self.do_parse_test('b :callers ', ["a"])
-        self.do_parse_test('["b" :callers]', ["a"])
-        self.do_parse_test('["b":callers ]', ["a"])
-        self.do_parse_test('["b"] :callers', ["a"])
-        self.do_parse_test('["b"]:callers ', ["a"])
+        self.do_parse_test(sample_graph, 'b :callers ', ["a"])
+        self.do_parse_test(sample_graph, '["b" :callers]', ["a"])
+        self.do_parse_test(sample_graph, '["b":callers ]', ["a"])
+        self.do_parse_test(sample_graph, '["b"] :callers', ["a"])
+        self.do_parse_test(sample_graph, '["b"]:callers ', ["a"])
 
 
 class TestRegex:
     @staticmethod
     def parse(s: str) -> Automaton[typing.Any]:
-        g = Graph()
+        g = PythonGraph()
         return parse_pathspec(g, s).nfa().lazy_dfa()
 
     def test_one(self) -> None:

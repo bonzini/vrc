@@ -7,16 +7,16 @@ import re
 import typing
 
 from .automata import nfa, regex
-from .graph import Graph
+from .graph import GraphMixin
 
 
 class Matcher(metaclass=abc.ABCMeta):
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         func = self.as_callable(g)
         return (node for node in g.all_nodes(True) if func(node))
 
     @abc.abstractmethod
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         pass
 
 
@@ -24,11 +24,11 @@ class Matcher(metaclass=abc.ABCMeta):
 class MatchByName(Matcher):
     node: str
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         if g.has_node(self.node):
             yield self.node
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         return self.node.__eq__
 
 
@@ -39,7 +39,7 @@ class MatchByRegex(Matcher):
     def __init__(self, regex: str):
         self.pat = re.compile(regex)
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         return lambda x: bool(self.pat.search(x))
 
 
@@ -47,10 +47,10 @@ class MatchByRegex(Matcher):
 class MatchLabel(Matcher):
     label: str
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         yield from g.labeled_nodes(self.label)
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         return lambda x: x in g.labeled_nodes(self.label)
 
 
@@ -65,10 +65,10 @@ class MatchWrapper(Matcher):
         else:
             return super().__new__(cls)
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         return self.matcher.match_nodes_in_graph(g)
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         return self.matcher.as_callable(g)
 
 
@@ -85,7 +85,7 @@ class MatchAnd(Matcher):
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         i = iter(self.matchers)
         try:
             nodes = set(next(i).match_nodes_in_graph(g))
@@ -97,7 +97,7 @@ class MatchAnd(Matcher):
             nodes = nodes.intersection(matcher.match_nodes_in_graph(g))
         yield from nodes
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         callables = [matcher.as_callable(g) for matcher in self.matchers]
         return lambda x: all((c(x) for c in callables))
 
@@ -113,13 +113,13 @@ class MatchNot(Matcher):
         else:
             return super().__new__(cls)
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         result = set(g.all_nodes(True))
         for node in self.matcher.match_nodes_in_graph(g):
             result.remove(node)
         yield from result
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         c = self.matcher.as_callable(g)
         return lambda x: not c(x)
 
@@ -137,7 +137,7 @@ class MatchOr(Matcher):
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         i = iter(self.matchers)
         try:
             nodes = set(next(i).match_nodes_in_graph(g))
@@ -149,7 +149,7 @@ class MatchOr(Matcher):
 
         yield from nodes
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         callables = [matcher.as_callable(g) for matcher in self.matchers]
         return lambda x: any((c(x) for c in callables))
 
@@ -161,7 +161,7 @@ class MatchCallees(Matcher):
     def __init__(self, matcher: Matcher):
         self.matcher = matcher
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         # TODO: what to do about external_ok/ref_ok?
         nodes: set[str] = set()
         for n in self.matcher.match_nodes_in_graph(g):
@@ -169,7 +169,7 @@ class MatchCallees(Matcher):
 
         yield from nodes
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         nodes = list(self.match_nodes_in_graph(g))
         return lambda x: x in nodes
 
@@ -181,7 +181,7 @@ class MatchCallers(Matcher):
     def __init__(self, matcher: Matcher):
         self.matcher = matcher
 
-    def match_nodes_in_graph(self, g: Graph) -> typing.Iterator[str]:
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         # TODO: what to do about ref_ok?
         nodes: set[str] = set()
         for n in self.matcher.match_nodes_in_graph(g):
@@ -189,7 +189,7 @@ class MatchCallers(Matcher):
 
         yield from nodes
 
-    def as_callable(self, g: Graph) -> nfa.Matcher:
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         nodes = list(self.match_nodes_in_graph(g))
         return lambda x: x in nodes
 
@@ -262,7 +262,7 @@ Nodes = separated_repeat(Node).value(lambda args: MatchOr(*args))
 
 
 @typing.no_type_check
-def _path_regex_parser(g: Graph) -> Parser:
+def _path_regex_parser(g: GraphMixin) -> Parser:
     from compynator.core import Terminal
     from compynator.niceties import Forward
 
@@ -301,5 +301,5 @@ def parse_nodespec(s: str) -> Matcher:
     return _compynator_parse(Nodes, s)  # type: ignore
 
 
-def parse_pathspec(g: Graph, s: str) -> regex.RegexAST:
+def parse_pathspec(g: GraphMixin, s: str) -> regex.RegexAST:
     return _compynator_parse(Path(g), s)  # type: ignore

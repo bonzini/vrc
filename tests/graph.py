@@ -2,7 +2,7 @@ import pytest
 import typing
 
 from vrc.automata import regex
-from vrc.graph import Graph
+from vrc.graph import GraphMixin
 from vrc.util import Path
 
 
@@ -12,24 +12,24 @@ def many_strings() -> list[str]:
 
 
 @pytest.fixture
-def graph_with_external_nodes(many_strings: list[str]) -> Graph:
-    graph = Graph()
+def graph_with_external_nodes(many_strings: list[str], graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+    graph = graph_class()
     for i in many_strings:
         graph.add_external_node(i)
     return graph
 
 
 @pytest.fixture
-def graph_with_nodes(many_strings: list[str]) -> Graph:
-    graph = Graph()
+def graph_with_nodes(many_strings: list[str], graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+    graph = graph_class()
     for i in many_strings:
         graph.add_node(i)
     return graph
 
 
 @pytest.fixture
-def graph_with_edges(many_strings: list[str]) -> Graph:
-    graph = Graph()
+def graph_with_edges(many_strings: list[str], graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+    graph = graph_class()
     for i in many_strings:
         graph.add_node(i)
     for n, i in enumerate(graph.all_nodes(False)):
@@ -38,10 +38,11 @@ def graph_with_edges(many_strings: list[str]) -> Graph:
     return graph
 
 
+@pytest.mark.usefixtures("graph_class")
 class TestVRCGraph:
-    def test_add_node(self) -> None:
+    def test_add_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating nodes."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         assert graph.has_node("a")
         assert not graph.is_node_external("a")
@@ -49,9 +50,9 @@ class TestVRCGraph:
         assert graph.has_node("b")
         assert graph.is_node_external("b")
 
-    def test_add_edge(self) -> None:
+    def test_add_edge(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating nodes."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -60,24 +61,24 @@ class TestVRCGraph:
         assert graph.edge_type("a", "b") == "call"
         assert graph.edge_type("a", "c") == "ref"
 
-    def test_all_files(self) -> None:
+    def test_all_files(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating nodes with files."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a", file="f.c")
         graph.add_node("b", file="g.c")
         assert sorted(graph.all_files()) == ["f.c", "g.c"]
 
-    def test_all_nodes(self) -> None:
+    def test_all_nodes(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check retrieving the list of defined nodes."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_external_node("b")
         assert sorted(graph.all_nodes(False)) == ["a"]
         assert sorted(graph.all_nodes(True)) == ["a", "b"]
 
-    def test_edge_to_nonexisting_node(self) -> None:
+    def test_edge_to_nonexisting_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating an edge to a function that is not defined."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_edge("a", "b", "call")
         assert graph.has_node("b")
@@ -86,35 +87,35 @@ class TestVRCGraph:
         assert not graph.filter_node("b", False)
         assert graph.filter_node("b", True)
 
-    def test_filter_edge_ref_ok(self) -> None:
+    def test_filter_edge_ref_ok(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check ref_ok argument to filter_edge."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_edge("a", "b", "ref")
         graph.add_node("b")
         assert not graph.filter_edge("a", "b", False)
         assert graph.filter_edge("a", "b", True)
 
-    def test_hide_external_ref(self) -> None:
+    def test_hide_external_ref(self, graph_class: typing.Type[GraphMixin]) -> None:
         """References to external symbols are hidden even with ref_ok=True."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_edge("a", "b", "ref")
         assert graph.has_node("b")
         assert not graph.filter_edge("a", "b", True)
 
-    def test_convert_external_node(self) -> None:
+    def test_convert_external_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating an edge before a function is defined."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_external_node("a")
         assert graph.has_node("a")
         graph.add_node("a")
         assert graph.has_node("a")
         assert graph.filter_node("a", False)
 
-    def test_callers_of_omitted_node(self) -> None:
+    def test_callers_of_omitted_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check edges."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -124,9 +125,9 @@ class TestVRCGraph:
         graph.omit_node("c")
         assert graph.filter_edge("a", "b", False)
 
-    def test_callees_of_omitted_node(self) -> None:
+    def test_callees_of_omitted_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check creating an edge before a function is defined."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -136,9 +137,9 @@ class TestVRCGraph:
         graph.omit_node("b")
         assert graph.filter_edge("b", "c", False)
 
-    def test_callers(self) -> None:
+    def test_callers(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callers(), "call" edges only."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -148,9 +149,9 @@ class TestVRCGraph:
         graph.add_edge("c", "d", "call")
         assert sorted(graph.callers("c", False)) == ["a", "b"]
 
-    def test_callers_ref_ok(self) -> None:
+    def test_callers_ref_ok(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callers(), "call" and "ref"."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -161,9 +162,9 @@ class TestVRCGraph:
         assert sorted(graph.callers("c", True)) == ["a", "b"]
         assert sorted(graph.callers("c", False)) == ["b"]
 
-    def test_callees(self) -> None:
+    def test_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callees(), "call" edges to non-external nodes."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -173,9 +174,9 @@ class TestVRCGraph:
         graph.add_edge("b", "d", "call")
         assert sorted(graph.callees("b", False, False)) == ["c", "d"]
 
-    def test_callees_ref_ok(self) -> None:
+    def test_callees_ref_ok(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callees(), "call" and "ref" edges."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -186,9 +187,9 @@ class TestVRCGraph:
         assert sorted(graph.callees("b", False, True)) == ["c", "d"]
         assert sorted(graph.callees("b", False, False)) == ["c"]
 
-    def test_callees_external_ok(self) -> None:
+    def test_callees_external_ok(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callees() for external nodes."""
-        graph = Graph()
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -198,16 +199,16 @@ class TestVRCGraph:
         assert sorted(graph.callees("b", True, False)) == ["c", "d"]
         assert sorted(graph.callees("b", False, False)) == ["c"]
 
-    def test_reset_filter(self) -> None:
-        graph = Graph()
+    def test_reset_filter(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.omit_node("a")
         assert not graph.filter_node("a", False)
         graph.reset_filter()
         assert graph.filter_node("a", False)
 
-    def test_omit_callees(self) -> None:
-        graph = Graph()
+    def test_omit_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -222,8 +223,8 @@ class TestVRCGraph:
         assert graph.filter_node("c", False)
         assert not graph.filter_node("d", False)
 
-    def test_omit_callers(self) -> None:
-        graph = Graph()
+    def test_omit_callers(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -244,8 +245,8 @@ class TestVRCGraph:
         graph.omit_callers("c")
         assert graph.filter_node("c", False)
 
-    def test_omit_callees_check_callers(self) -> None:
-        graph = Graph()
+    def test_omit_callees_check_callers(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -260,8 +261,8 @@ class TestVRCGraph:
         assert sorted(graph.callees("c", False, False)) == ["b"]
         # TODO: test that c -> b and e -> a are in the DOT output
 
-    def test_omit_callers_check_callees(self) -> None:
-        graph = Graph()
+    def test_omit_callers_check_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -274,8 +275,8 @@ class TestVRCGraph:
         assert sorted(graph.callees("b", False, False)) == ["c"]
         # TODO: test that b -> c is the only edge left in the DOT output
 
-    def test_labels(self) -> None:
-        graph = Graph()
+    def test_labels(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -296,8 +297,8 @@ class TestVRCGraph:
         graph.add_label("c", "L2")
         assert sorted(graph.labeled_nodes("L2")) == ["b", "c"]
 
-    def test_reset_labels(self) -> None:
-        graph = Graph()
+    def test_reset_labels(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_label("a", "L1")
@@ -310,34 +311,34 @@ class TestVRCGraph:
         assert not graph.has_label("b", "L2")
         assert sorted(graph.labels()) == []
 
-    def test_benchmark_add_external_node(self, benchmark: typing.Any, many_strings: list[str]) -> None:
+    def test_benchmark_add_external_node(self, benchmark: typing.Any, many_strings: list[str], graph_class: typing.Type[GraphMixin]) -> None:
         def func() -> None:
-            graph = Graph()
+            graph = graph_class()
             for i in many_strings:
                 graph.add_external_node(i)
         benchmark(func)
 
-    def test_benchmark_add_node(self, benchmark: typing.Any, many_strings: list[str]) -> None:
+    def test_benchmark_add_node(self, benchmark: typing.Any, many_strings: list[str], graph_class: typing.Type[GraphMixin]) -> None:
         def func() -> None:
-            graph = Graph()
+            graph = graph_class()
             for i in many_strings:
                 graph.add_node(i)
         benchmark(func)
 
-    def test_benchmark_define_node(self, benchmark: typing.Any, many_strings: list[str], graph_with_external_nodes: Graph) -> None:
+    def test_benchmark_define_node(self, benchmark: typing.Any, many_strings: list[str], graph_with_external_nodes: GraphMixin) -> None:
         def func() -> None:
             for n, i in enumerate(many_strings):
                 graph_with_external_nodes.add_node(i, file=["a.c", "b.c", "c.c"][n % 3])
         benchmark(func)
 
-    def test_benchmark_add_edge(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: Graph) -> None:
+    def test_benchmark_add_edge(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: GraphMixin) -> None:
         def func() -> None:
             for n, i in enumerate(graph_with_nodes.all_nodes(False)):
                 for j in range([1, 13, 2, 3, 2, 7, 0][n % 7]):
                     graph_with_nodes.add_edge(i, many_strings[(n + j + 1) * 17 % 10000], "call")
         benchmark(func)
 
-    def test_benchmark_add_label(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: Graph) -> None:
+    def test_benchmark_add_label(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: GraphMixin) -> None:
         def func() -> None:
             for n, i in enumerate(graph_with_nodes.all_nodes(True)):
                 graph_with_nodes.add_label(many_strings[(n + 1) * 17 % 10000], "L1")
@@ -345,13 +346,14 @@ class TestVRCGraph:
                 graph_with_nodes.add_label(many_strings[(n + 1) * 23 % 5000 * 2], "L3")
         benchmark(func)
 
-    def test_benchmark_edges(self, benchmark: typing.Any, many_strings: list[str], graph_with_edges: Graph) -> None:
+    def test_benchmark_edges(self, benchmark: typing.Any, many_strings: list[str], graph_with_edges: GraphMixin) -> None:
         def func() -> None:
             for i in graph_with_edges.all_nodes(True):
                 graph_with_edges.callers(i, False)
         benchmark(func)
 
 
+@pytest.mark.usefixtures("graph_class")
 class TestPath:
     def test_path(self) -> None:
         p = Path()
@@ -387,8 +389,8 @@ class TestPath:
         p.pop()
 
     @staticmethod
-    def graph_for_paths() -> Graph:
-        graph = Graph()
+    def graph_for_paths(graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+        graph = graph_class()
         graph.add_node("a")
         graph.add_node("b")
         graph.add_node("c")
@@ -402,27 +404,27 @@ class TestPath:
         return graph
 
     @staticmethod
-    def get_all_paths(graph: Graph, ast: regex.RegexAST,
+    def get_all_paths(graph: GraphMixin, ast: regex.RegexAST,
                       external_ok: bool = True, ref_ok: bool = True) -> list[list[str]]:
         return [list(path) for path in graph.paths(ast.nfa().lazy_dfa(), external_ok, ref_ok)]
 
-    def test_sample_graph(self) -> None:
-        graph = self.graph_for_paths()
+    def test_sample_graph(self, graph_class: typing.Type[GraphMixin]) -> None:
+        graph = self.graph_for_paths(graph_class)
         assert graph.has_label("a", "L1")
         assert not graph.has_label("b", "L1")
         assert graph.has_label("c", "L1")
         assert not graph.has_label("d", "L1")
 
-    def test_path_one_node(self) -> None:
+    def test_path_one_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a simple one-node path."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.One("a".__eq__)
         result = self.get_all_paths(graph, ast)
         assert result == [["a"]]
 
-    def test_path_two_nodes(self) -> None:
+    def test_path_two_nodes(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a simple two-node path."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One("a".__eq__),
             regex.One("b".__eq__)
@@ -430,9 +432,9 @@ class TestPath:
         result = self.get_all_paths(graph, ast)
         assert result == [["b", "a"]]
 
-    def test_path_star(self) -> None:
+    def test_path_star(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a simple path with multiple-length solutions."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One("a".__eq__),
             regex.Star(regex.One(lambda x: True)),
@@ -444,9 +446,9 @@ class TestPath:
         assert result[0] == ["d", "a"]
         assert result[1] == ["d", "c", "b", "a"]
 
-    def test_label(self) -> None:
+    def test_label(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a simple path with one-node path with labels."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.One(lambda x: graph.has_label(x, "L1"))
         result = self.get_all_paths(graph, ast)
         result = sorted(result, key=lambda x: x[0])
@@ -454,9 +456,9 @@ class TestPath:
         assert result[0] == ["a"]
         assert result[1] == ["c"]
 
-    def test_complex(self) -> None:
+    def test_complex(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a complex path with labels and stars."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One("a".__eq__),
             regex.Star(regex.One(lambda x: True)),
@@ -467,9 +469,9 @@ class TestPath:
         result = self.get_all_paths(graph, ast)
         assert result == [["d", "c", "b", "a"]]
 
-    def test_no_label(self) -> None:
+    def test_no_label(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a path with stars on labels."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One("a".__eq__),
             regex.Star(regex.One(lambda x: not graph.has_label(x, "L1"))),
@@ -478,9 +480,9 @@ class TestPath:
         result = self.get_all_paths(graph, ast)
         assert result == [["d", "a"]]
 
-    def test_no_ref(self) -> None:
+    def test_no_ref(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test filtering out references."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One(lambda x: graph.has_label(x, "L1")),
             regex.One(lambda x: not graph.has_label(x, "L1")),
@@ -493,9 +495,9 @@ class TestPath:
         assert result[0] == ["d", "a"]
         assert result[1] == ["d", "c"]
 
-    def test_no_external(self) -> None:
+    def test_no_external(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test filtering out external nodes."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.Sequence(
             regex.One(lambda x: graph.has_label(x, "L1")),
             regex.One(lambda x: not graph.has_label(x, "L1")),
@@ -505,9 +507,9 @@ class TestPath:
         # a->d, c->d are filtered out
         assert result == [["b", "a"]]
 
-    def test_omit_callees(self) -> None:
+    def test_omit_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test filtering of edges."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         graph.omit_callees("b")
         ast = regex.Sequence(
             regex.One("a".__eq__),
@@ -517,9 +519,9 @@ class TestPath:
         result = self.get_all_paths(graph, ast)
         assert result == [["d", "a"]]
 
-    def test_omit_node(self) -> None:
+    def test_omit_node(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test filtering of nodes."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         graph.omit_node("b")
         ast = regex.Sequence(
             regex.One("a".__eq__),
@@ -529,9 +531,9 @@ class TestPath:
         result = self.get_all_paths(graph, ast)
         assert result == [["d", "a"]]
 
-    def test_only(self) -> None:
+    def test_only(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test filter_default = False."""
-        graph = self.graph_for_paths()
+        graph = self.graph_for_paths(graph_class)
         ast = regex.One(lambda x: graph.has_label(x, "L1"))
         graph.filter_default = False
         graph.keep_node("a")
