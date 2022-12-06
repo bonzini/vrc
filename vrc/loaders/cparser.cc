@@ -123,20 +123,22 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
 
     switch (c.kind) {
     case CXCursor_FunctionDecl:
-        CXString save_current_function = state->current_function;
-        state->current_function = clang_getCursorSpelling(c);
-        CXSourceLocation loc = clang_getCursorLocation(c);
-        if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
-            verbose_print(state, "found function definition");
-            add_node(state);
-            result = visit(state, c, visit_function_body);
-        } else {
-            verbose_print(state, "found function declaration");
-            result = visit(state, c, visit_function_decl);
+        {
+            CXString save_current_function = state->current_function;
+            state->current_function = clang_getCursorSpelling(c);
+            CXSourceLocation loc = clang_getCursorLocation(c);
+            if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
+                verbose_print(state, "found function definition");
+                add_node(state);
+                result = visit(state, c, visit_function_body);
+            } else {
+                verbose_print(state, "found function declaration");
+                result = visit(state, c, visit_function_decl);
+            }
+            clang_disposeString(state->current_function);
+            state->current_function = save_current_function;
+            break;
         }
-        clang_disposeString(state->current_function);
-        state->current_function = save_current_function;
-        break;
 
     default:
         break;
@@ -144,53 +146,63 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
     return result;
 }
 
-void build_graph(const char *filename, const char *const *args, int num_args,
-		 const char *out_path, bool verbose, char **diagnostic)
+static void create_parser(CXTranslationUnit &tu, CXIndex &idx,
+                          const char *filename, const char *const *args, int num_args,
+                          char **diagnostic)
 {
-    int i;
-
-    CXIndex idx = clang_createIndex(1, 1);
-    CXTranslationUnit tu = clang_createTranslationUnitFromSourceFile(
+    idx = clang_createIndex(1, 1);
+    tu = clang_createTranslationUnitFromSourceFile(
         idx, NULL, num_args, args, 0, NULL);
 
     if (!tu) {
         *diagnostic = strdup("could not create translation unit");
-        goto out_index;
+        clang_disposeIndex(idx);
+        return;
     }
 
     CXDiagnosticSet diags = clang_getDiagnosticSetFromTU(tu);
     int num_diag = clang_getNumDiagnosticsInSet(diags);
-    for (i = 0; i < num_diag; i++) {
+    for (int i = 0; i < num_diag; i++) {
         CXDiagnostic diag = clang_getDiagnosticInSet(diags, i);
         enum CXDiagnosticSeverity sev = clang_getDiagnosticSeverity(diag);
         clang_disposeDiagnostic(diag);
         if (sev >= CXDiagnostic_Error) {
             *diagnostic = strdup("error parsing C file");
-            goto out_diags;
+            break;
         }
     }
 
-    FILE *outf = fopen(out_path, "w");
-    if (!outf) {
-        *diagnostic = strdup("error opening output file");
-        goto out_diags;
+    clang_disposeDiagnosticSet(diags);
+}
+
+void build_graph(const char *filename, const char *const *args, int num_args,
+		 const char *out_path, bool verbose, char **diagnostic)
+{
+    CXIndex idx;
+    CXTranslationUnit tu;
+
+    create_parser(tu, idx, filename, args, num_args, diagnostic);
+    if (!tu) {
+        return;
     }
 
-    VisitorState state = {
-        .filename = filename,
-        .outf = outf,
-        .verbose = verbose,
-    };
-    visit(&state, clang_getTranslationUnitCursor(tu), visit_clang_tu);
+    FILE *outf = fopen(out_path, "w");
+    if (outf) {
+        VisitorState state = {
+            .filename = filename,
+            .outf = outf,
+            .verbose = verbose,
+        };
+        visit(&state, clang_getTranslationUnitCursor(tu), visit_clang_tu);
 
-    if (ferror(outf)) {
-        *diagnostic = strdup("error writing output file");
+        if (ferror(outf)) {
+            *diagnostic = strdup("error writing output file");
+        }
+    } else {
+        *diagnostic = strdup("error opening output file");
     }
 
     fclose(outf);
-out_diags:
-    clang_disposeDiagnosticSet(diags);
     clang_disposeTranslationUnit(tu);
-out_index:
     clang_disposeIndex(idx);
 }

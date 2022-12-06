@@ -13,7 +13,7 @@ endif
 py.extension_module(
   'cython_loader',
   'cython_loader.pyx',
-  'cparser.c',
+  'cparser.cc',
   dependencies : [clang, py_dep],
   subdir: 'vrc/loaders',
   install: true,
