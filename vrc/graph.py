@@ -84,7 +84,7 @@ class Graph:
         self.nodes[caller][callee] = type
         self.nodes[callee].callers.add(caller)
 
-    def _get_node(self, name: str) -> typing.Optional[Node]:
+    def get_node(self, name: str) -> typing.Optional[Node]:
         if name in self.nodes_by_username:
             return self.nodes_by_username[name]
         elif name in self.nodes:
@@ -93,15 +93,15 @@ class Graph:
             return None
 
     def has_node(self, name: str) -> bool:
-        return bool(self._get_node(name))
+        return bool(self.get_node(name))
 
     def is_node_external(self, name: str) -> bool:
-        node = self._get_node(name)
+        node = self.get_node(name)
         return bool(node and node.external)
 
     def edge_type(self, src: str, dest: str) -> str:
-        srcnode = self._get_node(src)
-        dstnode = self._get_node(dest)
+        srcnode = self.get_node(src)
+        dstnode = self.get_node(dest)
         assert srcnode and dstnode
         return srcnode[dstnode.name]
 
@@ -114,11 +114,11 @@ class Graph:
             visited.add(n.name)
             yield n.username or n.name
             for caller in targets(n):
-                target = self._get_node(caller)
+                target = self.get_node(caller)
                 if target:
                     yield from visit(target)
 
-        n = self._get_node(start)
+        n = self.get_node(start)
         if not n:
             return iter({})
         yield from visit(n)
@@ -130,7 +130,7 @@ class Graph:
         return self._visit(caller, lambda n: n.callees.keys())
 
     def callers(self, callee: str, ref_ok: bool) -> typing.Iterator[str]:
-        n = self._get_node(callee)
+        n = self.get_node(callee)
         if not n:
             return iter([])
         return (
@@ -139,7 +139,7 @@ class Graph:
             if self.filter_node(caller, True) and self.filter_edge(caller, callee, ref_ok))
 
     def callees(self, caller: str, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
-        n = self._get_node(caller)
+        n = self.get_node(caller)
         if not n:
             return iter([])
         return (self.name(callee)
@@ -173,7 +173,7 @@ class Graph:
         return self.filter_default
 
     def filter_node(self, x: str, external_ok: bool) -> bool:
-        n = self._get_node(x)
+        n = self.get_node(x)
         if not n:
             return False
         return self._filter_node(n, external_ok)
@@ -186,14 +186,14 @@ class Graph:
         return caller_node[callee_node.name] == "call" or (ref_ok and not callee_node.external)
 
     def filter_edge(self, caller: str, callee: str, ref_ok: bool) -> bool:
-        caller_node = self._get_node(caller)
-        callee_node = self._get_node(callee)
+        caller_node = self.get_node(caller)
+        callee_node = self.get_node(callee)
         if not caller_node or not callee_node:
             return False
         return self._filter_edge(caller_node, callee_node, ref_ok)
 
     def omit_node(self, name: str) -> None:
-        n = self._get_node(name)
+        n = self.get_node(name)
         name = n.name if n else name
 
         self.omitted.add(name)
@@ -212,7 +212,7 @@ class Graph:
         self.omit_node(name)
 
     def omit_callers(self, name: str) -> None:
-        n = self._get_node(name)
+        n = self.get_node(name)
         name = n.name if n else name
 
         self.omitting_callers.add(name)
@@ -222,7 +222,7 @@ class Graph:
                 self._check_node_visibility(caller)
 
     def omit_callees(self, name: str) -> None:
-        n = self._get_node(name)
+        n = self.get_node(name)
         name = n.name if n else name
 
         self.omitting_callees.add(name)
@@ -235,7 +235,7 @@ class Graph:
         if self.keep is None:
             self.keep = set()
 
-        n = self._get_node(name)
+        n = self.get_node(name)
         name = n.name if n else name
 
         self.keep.add(name)
@@ -267,7 +267,7 @@ class Graph:
         def visit(caller: typing.Optional[Node], nodes: typing.Iterable[str],
                   state: typing.Any) -> typing.Iterable[typing.Iterable[str]]:
             for target in nodes:
-                node = self._get_node(target)
+                node = self.get_node(target)
                 assert node is not None
                 if node in visited:
                     continue
@@ -300,3 +300,10 @@ class Graph:
         self.omitting_callees = set()
         self.keep = None
         self.filter_default = True
+
+    """Like get_node(), but fails if no such node exists."""
+    def __getitem__(self, name: str) -> Node:
+        node = self.get_node(name)
+        if node is None:
+            raise IndexError
+        return node
