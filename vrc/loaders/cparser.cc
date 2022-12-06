@@ -28,9 +28,22 @@ void add_external_node(VisitorState *state)
     fprintf(state->outf, "node --external %s\n", clang_getCString(state->current_function));
 }
 
-void add_node(VisitorState *state)
+void add_node(VisitorState *state, CXCursor c)
 {
-    fprintf(state->outf, "node %s\n", clang_getCString(state->current_function));
+    CXSourceLocation loc = clang_getCursorLocation(c);
+
+    CXFile file;
+    unsigned int line;
+    clang_getSpellingLocation(loc, &file, &line, NULL, NULL);
+
+    CXString file_name = clang_getFileName(file);
+
+    fprintf(state->outf, "node %s %s %u\n",
+            clang_getCString(state->current_function),
+            clang_getCString(file_name), line
+            );
+
+    clang_disposeString(file_name);
 }
 
 void add_edge(VisitorState *state, CXCursor target, bool is_call)
@@ -129,7 +142,7 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
             CXSourceLocation loc = clang_getCursorLocation(c);
             if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
                 verbose_print(state, "found function definition");
-                add_node(state);
+                add_node(state, c);
                 result = visit(state, c, visit_function_body);
             } else {
                 verbose_print(state, "found function declaration");
