@@ -118,9 +118,6 @@ cdef class Node:
 
 
 cdef class Graph:
-    cdef cgraph.Graph *g
-    cdef list nodes_by_index
-
     def __cinit__(self) -> None:
         self.g = cgraph.graph_new()
         self.nodes_by_index = []
