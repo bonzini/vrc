@@ -4,12 +4,14 @@
 import concurrent.futures as conc
 import os
 
+cimport vrc.cython_graph as cython_graph
 cimport vrc.loaders.cparser as cparser
+cimport vrc.cgraph as cgraph
 from libc.stdio cimport puts
 from libc.stdlib cimport malloc, free
 
 from . import ClangLoader, ResolutionError
-from vrc.cli.commands import VRCCommand
+from vrc.cli.commands import GRAPH
 
 
 cdef extern from "Python.h":
@@ -29,18 +31,18 @@ cdef char **to_cstring_array(list list_str) except NULL:
 
 
 # Export it to Python for testcases.
-cpdef int build_graph(str filename, list args, str out_path, bint verbose) except -1:
-    if not out_path:
-        raise TypeError("expected str")
+cpdef int build_graph(str filename, list args, cython_graph.Graph graph, bint verbose) except -1:
+    if graph is None:
+        raise TypeError("expected CythonGraph")
 
     cdef char *diagnostic = NULL
     cdef char *c_filename = PyUnicode_AsUTF8(filename) if filename else NULL
     cdef char **c_args = to_cstring_array(args)
     cdef int n_args = len(args)
-    cdef char *c_out_path = PyUnicode_AsUTF8(out_path)
+    cdef cgraph.Graph *g = <cgraph.Graph *> graph.g
     with nogil:
         cparser.build_graph(c_filename, c_args, n_args,
-                            c_out_path, verbose, &diagnostic)
+                            g, verbose, &diagnostic)
     free(c_args)
     if diagnostic:
         try:
@@ -49,6 +51,10 @@ cpdef int build_graph(str filename, list args, str out_path, bint verbose) excep
             free(diagnostic)
 
 class LibclangLoader(ClangLoader):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.force = True
+
     def get_executor(self):
         # Because build_graph can drop the GIL, a ThreadPoolExecutor can
         # process the files in parallel.
@@ -57,5 +63,7 @@ class LibclangLoader(ClangLoader):
         return conc.ThreadPoolExecutor(max_workers=ntasks)
 
     def save_graph(self, filename, args, out_path):
-        build_graph(filename, args, out_path,
-                    self.verbose_print is print)
+        with open(out_path, 'w') as f:
+            print('# using clang loader', file=f)
+            build_graph(filename, args, GRAPH,
+                        self.verbose_print is print)
