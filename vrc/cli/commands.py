@@ -237,14 +237,16 @@ class NodeCommand(VRCCommand):
                             help="Name for the new node")
         parser.add_argument("file", metavar="FILE", nargs="?",
                             help="File in which the new node is defined")
+        parser.add_argument("line", metavar="LINE", nargs="?", type=int,
+                            help="Line in which the new node is defined")
 
     def run(self, args: argparse.Namespace) -> None:
-        if args.external and args.file:
-            raise argparse.ArgumentError(None, "file not allowed for external symbols")
+        if args.external and (args.file or args.line):
+            raise argparse.ArgumentError(None, "file/line not allowed for external symbols")
         if args.external:
             GRAPH.add_external_node(args.name)
         else:
-            GRAPH.add_node(args.name, file=args.file)
+            GRAPH.add_node(args.name, file=args.file, line=args.line)
 
 
 class EdgeCommand(VRCCommand):
