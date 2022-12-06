@@ -24,6 +24,7 @@ class Node:
     callees: dict[str, str]
     username: typing.Optional[str] = None
     file: typing.Optional[str] = None
+    line: typing.Optional[int] = None
     external: bool = True
 
     def __init__(self, name: str) -> None:
@@ -68,13 +69,15 @@ class Graph:
             self.nodes[name] = Node(name=name)
 
     def add_node(self, name: str, username: typing.Optional[str] = None,
-                 file: typing.Optional[str] = None) -> None:
+                 file: typing.Optional[str] = None,
+                 line: typing.Optional[int] = None) -> None:
         self.add_external_node(name)
         node = self.nodes[name]
         if node.external:
             # This is now a defined node.  It might have a username and a file
             node.username = username
             node.file = file
+            node.line = line
             node.external = False
             if username:
                 self.nodes_by_username[username] = node
