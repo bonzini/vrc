@@ -125,7 +125,8 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
     case CXCursor_FunctionDecl:
         CXString save_current_function = state->current_function;
         state->current_function = clang_getCursorSpelling(c);
-        if (clang_isCursorDefinition(c)) {
+        CXSourceLocation loc = clang_getCursorLocation(c);
+        if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
             verbose_print(state, "found function definition");
             add_node(state);
             result = visit(state, c, visit_function_body);
