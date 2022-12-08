@@ -196,6 +196,54 @@ std::optional<CXCursor> find_referenced(CXCursor c)
     return referenced;
 }
 
+typedef struct BinaryOperator {
+    std::string spelling;
+    CXCursor lhs;
+    CXCursor rhs;
+} BinaryOperator;
+
+std::optional<BinaryOperator> inspect_binary_operator(CXCursor c)
+{
+    std::optional<CXCursor> lhs, rhs;
+
+    // get operands
+
+    functor_visit(c, [&lhs, &rhs](CXCursor c, CXCursor parent) {
+        if (!lhs) {
+            lhs = c;
+            return CXChildVisit_Continue;
+        } else if (!rhs) {
+            rhs = c;
+            return CXChildVisit_Continue;
+        } else {
+            // more children than expected
+            lhs.reset();
+            rhs.reset();
+            return CXChildVisit_Break;
+        }
+    });
+
+    if (!lhs || !rhs) {
+        return {};
+    }
+
+    // get spelling
+
+    CXTranslationUnit tu = clang_Cursor_getTranslationUnit(c);
+    CXSourceLocation loc = clang_getRangeEnd(clang_getCursorExtent(*lhs));
+
+    CXToken *op_token = clang_getToken(tu, loc);
+    if (!op_token) {
+        return {};
+    }
+
+    CXString op_spelling_str = clang_getTokenSpelling(tu, *op_token);
+    std::string spelling{clang_getCString(op_spelling_str)};
+    clang_disposeString(op_spelling_str);
+
+    return { { spelling, *lhs, *rhs } };
+}
+
 enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, VisitorState *state)
 {
     enum CXChildVisitResult result = CXChildVisit_Recurse;
@@ -215,6 +263,19 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
             CXCursor target = clang_getCursorReferenced(c);
             if (!clang_isInvalid(target.kind)) {
                 add_edge(state, state->current_function, target, false);
+            }
+        }
+        break;
+
+    case CXCursor_BinaryOperator:
+        if (auto bin_op = inspect_binary_operator(c)) {
+            if (bin_op->spelling == "=") {
+                auto source = find_referenced(bin_op->lhs);
+                auto target = find_referenced(bin_op->rhs);
+
+                if (source && target) {
+                    add_edge(state, *source, *target, true);
+                }
             }
         }
         break;
