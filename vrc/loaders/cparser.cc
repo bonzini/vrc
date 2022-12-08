@@ -5,6 +5,7 @@
 #include <string.h>
 #include <string>
 #include <optional>
+#include <utility>
 
 #include <clang-c/Index.h>
 
@@ -105,19 +106,25 @@ size_t add_node(VisitorState *state, CXCursor c)
     return i;
 }
 
-void add_edge(VisitorState *state, CXCursor target, bool is_call)
+// Only actually adds the edge if `src` and `dst` are CXCursor_FunctionDecl or
+// CXCursor_FieldDecl.
+void add_edge(VisitorState *state, CXCursor src, CXCursor dst, bool is_call)
 {
-    CXString target_str = clang_getCursorSpelling(target);
+    auto src_name = get_node_name(src);
+    auto dst_name = get_node_name(dst);
 
-    verbose_print(state, "found %s to %s",
-                  is_call ? "call" : "reference",
-                  clang_getCString(target_str));
+    if (src_name && dst_name) {
+        verbose_print(state, "found %s from %s to %s",
+                      is_call ? "call" : "reference",
+                      src_name->c_str(),
+                      dst_name->c_str());
 
-    size_t src = add_external_node(state, state->current_function);
-    size_t dest = graph_add_external_node(&state->t, state->g,
-                                          clang_getCString(target_str));
-    graph_add_edge(&state->t, state->g, src, dest, is_call);
-    clang_disposeString(target_str);
+        size_t src_i = graph_add_external_node(&state->t, state->g,
+                                               src_name->c_str());
+        size_t dest_i = graph_add_external_node(&state->t, state->g,
+                                                dst_name->c_str());
+        graph_add_edge(&state->t, state->g, src_i, dest_i, is_call);
+    }
 }
 
 // Crashes if `target` is not a CXCursor_FunctionDecl or CXCursor_FieldDecl.
@@ -179,6 +186,41 @@ static enum CXChildVisitResult visit(CXCursor c, F func, Arg&&... arg)
     return Visitor<F, Arg...>::visit(c, func, std::forward<Arg>(arg)...);
 }
 
+// Tries to find the declaration of whatever function or function pointer the
+// expression `c` references, even if it is hidden behind
+// CXCursor_UnexposedExpr, CXCursor_ParenExpr, or CXCursor_UnaryOperator nodes.
+std::optional<CXCursor> find_referenced(CXCursor c)
+{
+    if (CXCursor ref = clang_getCursorReferenced(c); !clang_Cursor_isNull(ref)) {
+        return ref;
+    }
+
+    std::optional<CXCursor> referenced;
+
+    visit(c, [&referenced](CXCursor c, CXCursor parent) {
+        if (!has_function_or_function_pointer_type(c)) {
+            return CXChildVisit_Continue;
+        }
+
+        CXCursor ref = clang_getCursorReferenced(c);
+
+        if (clang_Cursor_isNull(ref)) {
+            bool traverse = c.kind == CXCursor_UnexposedExpr ||
+                            c.kind == CXCursor_ParenExpr ||
+                            c.kind == CXCursor_UnaryOperator;
+            return traverse ? CXChildVisit_Recurse : CXChildVisit_Continue;
+        } else if (!referenced) {
+            referenced = ref;
+            return CXChildVisit_Continue;
+        } else {
+            referenced.reset();
+            return CXChildVisit_Break;
+        }
+    });
+
+    return referenced;
+}
+
 enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, VisitorState *state)
 {
     enum CXChildVisitResult result = CXChildVisit_Recurse;
@@ -188,7 +230,7 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
         {
             CXCursor target = clang_getCursorReferenced(c);
             if (!clang_isInvalid(target.kind)) {
-                add_edge(state, target, true);
+                add_edge(state, state->current_function, target, true);
             }
         }
         break;
@@ -197,7 +239,7 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
         {
             CXCursor target = clang_getCursorReferenced(c);
             if (!clang_isInvalid(target.kind)) {
-                add_edge(state, target, false);
+                add_edge(state, state->current_function, target, false);
             }
         }
         break;
@@ -263,6 +305,32 @@ bool has_empty_spelling(CXCursor c)
     return empty;
 }
 
+void visit_field_designated_initializer(CXCursor c, VisitorState *state)
+{
+    std::optional<CXCursor> source;
+
+    visit(c, [state, &source](CXCursor c, CXCursor parent) {
+        switch (c.kind)
+        {
+        case CXCursor_MemberRef:
+            if (has_function_or_function_pointer_type(c)) {
+                source = clang_getCursorReferenced(c);
+                return CXChildVisit_Continue;
+            } else {
+                return CXChildVisit_Break;
+            }
+
+        default:
+            if (source && has_function_or_function_pointer_type(c)) {
+                if (auto target = find_referenced(c)) {
+                    add_edge(state, *source, *target, true);
+                }
+            }
+            return CXChildVisit_Break;
+        }
+    });
+}
+
 enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState *state)
 {
     enum CXChildVisitResult result = CXChildVisit_Recurse;
@@ -291,6 +359,17 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
         } else {
             result = visit(c, visit_struct, state);
         }
+        break;
+
+    case CXCursor_InitListExpr:
+        // for each field initializer
+        visit(c, [state](CXCursor c, CXCursor parent) {
+            if (c.kind == CXCursor_UnexposedExpr) {
+                // probably a designated initializer
+                visit_field_designated_initializer(c, state);
+            }
+            return CXChildVisit_Continue;
+        });
         break;
 
     default:
