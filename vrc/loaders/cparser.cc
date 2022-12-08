@@ -1,7 +1,10 @@
 #include "cparser.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <string>
+#include <optional>
 
 #include <clang-c/Index.h>
 
@@ -14,7 +17,7 @@ typedef struct VisitorState {
     Graph *g;
     const char *filename;
     bool verbose;
-    CXString current_function{NULL};
+    CXCursor current_function;
     RCUThread t{};
 } VisitorState;
 
@@ -22,23 +25,74 @@ typedef enum CXChildVisitResult VisitorFunc(CXCursor cursor, CXCursor parent, Vi
 
 #define verbose_print(s, fmt, ...) do {                                     \
     if ((s)->verbose) {                                                     \
+        CXString spelling = clang_getCursorSpelling((s)->current_function); \
         fprintf(stderr, "%s%s%s: " fmt "\n",                                \
-		(s)->filename,                                              \
+                (s)->filename,                                              \
                 (s)->filename ? ": " : "",                                  \
-                clang_getCString((s)->current_function), ## __VA_ARGS__);   \
+                clang_getCString(spelling), ## __VA_ARGS__);                \
+        clang_disposeString(spelling);                                      \
     }                                                                       \
 } while (0)
 
-void add_external_node(VisitorState *state)
+bool has_function_or_function_pointer_type(CXCursor c)
 {
-    graph_add_external_node(&state->t, state->g,
-                            clang_getCString(state->current_function));
+    CXType type = clang_getCursorType(c);
+    CXType canonical_type = clang_getCanonicalType(type); // without typedefs
+
+    return canonical_type.kind == CXType_FunctionProto || (
+        canonical_type.kind == CXType_Pointer &&
+        clang_getPointeeType(canonical_type).kind == CXType_FunctionProto);
 }
 
-void add_node(VisitorState *state, CXCursor c)
+std::optional<std::string> get_node_name(CXCursor c)
 {
-    size_t i = graph_add_external_node(&state->t, state->g,
-                                       clang_getCString(state->current_function));
+    std::optional<std::string> name;
+
+    CXString c_spelling = clang_getCursorSpelling(c);
+
+    switch (c.kind) {
+    case CXCursor_FunctionDecl:
+        name = clang_getCString(c_spelling);
+        break;
+
+    case CXCursor_FieldDecl:
+        if (has_function_or_function_pointer_type(c))
+        {
+            CXCursor parent = clang_getCursorSemanticParent(c);
+            CXString struct_spelling = clang_getCursorSpelling(parent);
+
+            name = clang_getCString(struct_spelling) + std::string{"::"}
+                + clang_getCString(c_spelling);
+
+            clang_disposeString(struct_spelling);
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    clang_disposeString(c_spelling);
+
+    return name;
+}
+
+// Crashes if `c` is not a CXCursor_FunctionDecl or CXCursor_FieldDecl.
+size_t add_external_node(VisitorState *state, CXCursor c)
+{
+    auto name = get_node_name(c);
+    assert(name);
+
+    return graph_add_external_node(&state->t, state->g, name->c_str());
+}
+
+// Crashes if `c` is not a CXCursor_FunctionDecl or CXCursor_FieldDecl.
+size_t add_node(VisitorState *state, CXCursor c)
+{
+    auto name = get_node_name(c);
+    assert(name);
+
+    size_t i = graph_add_external_node(&state->t, state->g, name->c_str());
     graph_set_defined(&state->t, state->g, i);
 
     CXSourceLocation loc = clang_getCursorLocation(c);
@@ -49,6 +103,8 @@ void add_node(VisitorState *state, CXCursor c)
     CXString file_name = clang_getFileName(file);
     graph_set_location(&state->t, state->g, i, clang_getCString(file_name), line);
     clang_disposeString(file_name);
+
+    return i;
 }
 
 void add_edge(VisitorState *state, CXCursor target, bool is_call)
@@ -59,23 +115,22 @@ void add_edge(VisitorState *state, CXCursor target, bool is_call)
                   is_call ? "call" : "reference",
                   clang_getCString(target_str));
 
-    size_t src = graph_add_external_node(&state->t, state->g,
-                                         clang_getCString(state->current_function));
+    size_t src = add_external_node(state, state->current_function);
     size_t dest = graph_add_external_node(&state->t, state->g,
                                           clang_getCString(target_str));
     graph_add_edge(&state->t, state->g, src, dest, is_call);
     clang_disposeString(target_str);
 }
 
-void add_label(VisitorState *state, CXCursor attr)
+// Crashes if `target` is not a CXCursor_FunctionDecl or CXCursor_FieldDecl.
+void add_label(VisitorState *state, CXCursor attr, CXCursor target)
 {
     CXString attr_str = clang_getCursorSpelling(attr);
 
     verbose_print(state, "found annotation %s", clang_getCString(attr_str));
 
-    size_t func = graph_add_external_node(&state->t, state->g,
-                                          clang_getCString(state->current_function));
-    graph_add_label(&state->t, state->g, func, clang_getCString(attr_str));
+    size_t i = add_external_node(state, target);
+    graph_add_label(&state->t, state->g, i, clang_getCString(attr_str));
     clang_disposeString(attr_str);
 }
 
@@ -87,19 +142,16 @@ static enum CXChildVisitResult visit(VisitorState *state,
     return result ? CXChildVisit_Break : CXChildVisit_Continue;
 }
 
-enum CXChildVisitResult visit_function_decl(CXCursor c, CXCursor parent, VisitorState *state)
+template<typename F>
+static enum CXChildVisitResult functor_visit(CXCursor c, F f)
 {
-    enum CXChildVisitResult result = CXChildVisit_Recurse;
+    auto actual_visitor = [](CXCursor cursor, CXCursor parent, CXClientData client_data) {
+        F *f = (F *)client_data;
+        return (*f)(cursor, parent);
+    };
 
-    switch (c.kind) {
-    case CXCursor_AnnotateAttr:
-        add_label(state, c);
-        break;
-
-    default:
-        break;
-    }
-    return result;
+    unsigned result = clang_visitChildren(c, actual_visitor, &f);
+    return result ? CXChildVisit_Break : CXChildVisit_Continue;
 }
 
 enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, VisitorState *state)
@@ -107,9 +159,6 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
     enum CXChildVisitResult result = CXChildVisit_Recurse;
 
     switch (c.kind) {
-    case CXCursor_AnnotateAttr:
-        result = visit_function_decl(c, parent, state);
-
     case CXCursor_CallExpr:
         {
             CXCursor target = clang_getCursorReferenced(c);
@@ -134,6 +183,61 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
     return result;
 }
 
+void retrieve_annotations(VisitorState *state, CXCursor c, CXCursor target)
+{
+    functor_visit(c, [state, target](CXCursor c, CXCursor parent) {
+        if (c.kind == CXCursor_AnnotateAttr) {
+            add_label(state, c, target);
+        }
+
+        return CXChildVisit_Continue;
+    });
+}
+
+enum CXChildVisitResult visit_struct(CXCursor c, CXCursor parent, VisitorState *state)
+{
+    if (c.kind == CXCursor_FieldDecl &&
+        has_function_or_function_pointer_type(c)) {
+        // found a function pointer field, encode it as a node
+
+        size_t i = add_node(state, c);
+        graph_add_label(&state->t, state->g, i, "function_pointer");
+
+        // The field's type is either (1) a typedef, (2) a pointer to a typedef,
+        // or (3) a pointer to a non-typedef.
+
+        retrieve_annotations(state, c, c);
+
+        CXType type = clang_getCursorType(c);
+
+        if (type.kind == CXType_Pointer) {
+            type = clang_getPointeeType(type);
+        }
+
+        if (type.kind == CXType_Typedef) {
+            functor_visit(c, [c, state](CXCursor child, CXCursor parent) {
+                if (child.kind == CXCursor_TypeRef) {
+                    CXCursor typedef_decl = clang_getCursorReferenced(child);
+                    retrieve_annotations(state, typedef_decl, c);
+                    return CXChildVisit_Break;
+                } else {
+                    return CXChildVisit_Continue;
+                }
+            });
+        }
+    }
+
+    return CXChildVisit_Continue;
+}
+
+bool has_empty_spelling(CXCursor c)
+{
+    CXString spelling = clang_getCursorSpelling(c);
+    bool empty = clang_getCString(spelling)[0] == '\0';
+    clang_disposeString(spelling);
+    return empty;
+}
+
 enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState *state)
 {
     enum CXChildVisitResult result = CXChildVisit_Recurse;
@@ -141,8 +245,8 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
     switch (c.kind) {
     case CXCursor_FunctionDecl:
         {
-            CXString save_current_function = state->current_function;
-            state->current_function = clang_getCursorSpelling(c);
+            CXCursor save_current_function = state->current_function;
+            state->current_function = c;
             CXSourceLocation loc = clang_getCursorLocation(c);
             if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
                 verbose_print(state, "found function definition");
@@ -150,12 +254,19 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
                 result = visit(state, c, visit_function_body);
             } else {
                 verbose_print(state, "found function declaration");
-                result = visit(state, c, visit_function_decl);
             }
-            clang_disposeString(state->current_function);
+            retrieve_annotations(state, c, c);
             state->current_function = save_current_function;
             break;
         }
+
+    case CXCursor_StructDecl:
+        if (has_empty_spelling(c)) {
+            result = CXChildVisit_Continue; // ignore anonymous structs
+        } else {
+            result = visit(state, c, visit_struct);
+        }
+        break;
 
     default:
         break;
