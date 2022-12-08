@@ -250,20 +250,14 @@ enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, Visitor
 
     switch (c.kind) {
     case CXCursor_CallExpr:
-        {
-            CXCursor target = clang_getCursorReferenced(c);
-            if (!clang_isInvalid(target.kind)) {
-                add_edge(state, state->current_function, target, true);
-            }
+        if (auto target = find_referenced(c)) {
+            add_edge(state, state->current_function, *target, true);
         }
         break;
 
     case CXCursor_FunctionDecl:
-        {
-            CXCursor target = clang_getCursorReferenced(c);
-            if (!clang_isInvalid(target.kind)) {
-                add_edge(state, state->current_function, target, false);
-            }
+        if (auto target = find_referenced(c)) {
+            add_edge(state, state->current_function, *target, false);
         }
         break;
 
