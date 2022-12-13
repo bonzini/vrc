@@ -1,4 +1,5 @@
-project('vrc', [], version: files('VERSION'))
+project('vrc', [], version: files('VERSION'),
+        default_options: ['optimization=2', 'debug=true'])
 
 fs = import('fs')
 py_mod = import('python')
