@@ -10,6 +10,10 @@ directly.  `vrc` supports `meson devenv` and `meson test`, so that
 tests can be run using `meson test` and the `vrc` tool can be started
 using `meson devenv python -m vrc`.
 
+When using `meson`, requirements have to be installed by hand:
+
+    pip install -r requirements.txt -r requirements_dev.txt
+
 # TODO
 
 * Write documentation

@@ -1,6 +1,41 @@
+import pytest
+import typing
+
 from vrc.automata import regex
 from vrc.graph import Graph
 from vrc.util import Path
+
+
+@pytest.fixture
+def many_strings() -> list[str]:
+    return [str(i) for i in range(1, 10001)]
+
+
+@pytest.fixture
+def graph_with_external_nodes(many_strings: list[str]) -> Graph:
+    graph = Graph()
+    for i in many_strings:
+        graph.add_external_node(i)
+    return graph
+
+
+@pytest.fixture
+def graph_with_nodes(many_strings: list[str]) -> Graph:
+    graph = Graph()
+    for i in many_strings:
+        graph.add_node(i)
+    return graph
+
+
+@pytest.fixture
+def graph_with_edges(many_strings: list[str]) -> Graph:
+    graph = Graph()
+    for i in many_strings:
+        graph.add_node(i)
+    for n, i in enumerate(graph.all_nodes(False)):
+        for j in range([1, 13, 2, 3, 2, 7, 0][n % 7]):
+            graph.add_edge(i, many_strings[(n + j + 1) * 17 * j % 10000], "call")
+    return graph
 
 
 class TestVRCGraph:
@@ -274,6 +309,47 @@ class TestVRCGraph:
         assert not graph.has_label("a", "L1")
         assert not graph.has_label("b", "L2")
         assert sorted(graph.labels()) == []
+
+    def test_benchmark_add_external_node(self, benchmark: typing.Any, many_strings: list[str]) -> None:
+        def func() -> None:
+            graph = Graph()
+            for i in many_strings:
+                graph.add_external_node(i)
+        benchmark(func)
+
+    def test_benchmark_add_node(self, benchmark: typing.Any, many_strings: list[str]) -> None:
+        def func() -> None:
+            graph = Graph()
+            for i in many_strings:
+                graph.add_node(i)
+        benchmark(func)
+
+    def test_benchmark_define_node(self, benchmark: typing.Any, many_strings: list[str], graph_with_external_nodes: Graph) -> None:
+        def func() -> None:
+            for n, i in enumerate(many_strings):
+                graph_with_external_nodes.add_node(i, file=["a.c", "b.c", "c.c"][n % 3])
+        benchmark(func)
+
+    def test_benchmark_add_edge(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: Graph) -> None:
+        def func() -> None:
+            for n, i in enumerate(graph_with_nodes.all_nodes(False)):
+                for j in range([1, 13, 2, 3, 2, 7, 0][n % 7]):
+                    graph_with_nodes.add_edge(i, many_strings[(n + j + 1) * 17 % 10000], "call")
+        benchmark(func)
+
+    def test_benchmark_add_label(self, benchmark: typing.Any, many_strings: list[str], graph_with_nodes: Graph) -> None:
+        def func() -> None:
+            for n, i in enumerate(graph_with_nodes.all_nodes(True)):
+                graph_with_nodes.add_label(many_strings[(n + 1) * 17 % 10000], "L1")
+                graph_with_nodes.add_label(many_strings[(n + 1) * 2 % 10000], "L2")
+                graph_with_nodes.add_label(many_strings[(n + 1) * 23 % 5000 * 2], "L3")
+        benchmark(func)
+
+    def test_benchmark_edges(self, benchmark: typing.Any, many_strings: list[str], graph_with_edges: Graph) -> None:
+        def func() -> None:
+            for i in graph_with_edges.all_nodes(True):
+                graph_with_edges.callers(i, False)
+        benchmark(func)
 
 
 class TestPath:
