@@ -18,14 +18,19 @@ endforeach
 
 pytest = find_program('pytest')
 if get_option('pytest_tap')
-  test('pytest', pytest, args: [ '--tap-stream' ],
+  test('pytest', pytest, args: [ '--benchmark-disable', '--tap-stream' ],
        env: testenv, protocol: 'tap',
        workdir: meson.project_build_root() / 'tests')
 else
-  test('pytest', pytest,
+  test('pytest', pytest, args: ['--benchmark-disable' ],
        env: testenv,
        workdir: meson.project_build_root() / 'tests')
 endif
+benchmark('pytest', pytest, args: ['--benchmark-only' ],
+          verbose: true,
+          env: testenv,
+          workdir: meson.project_build_root() / 'tests')
+
 test('flake8', find_program('flake8'), args: pyfiles,
      env: testenv,
      workdir: meson.project_source_root())
