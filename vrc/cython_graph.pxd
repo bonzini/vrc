@@ -8,3 +8,5 @@ cimport vrc.cgraph as cgraph
 cdef class Graph:
     cdef cgraph.Graph *g
     cdef list nodes_by_index
+
+    cdef object iter_to_python(self, cgraph.Iter *i)

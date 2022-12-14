@@ -14,7 +14,7 @@ extern "C" {
 #endif
 
 Graph *graph_new();
-void graph_delete(RCUThread *rcu, Graph *g);
+void graph_delete(Graph *g);
 
 size_t graph_add_external_node(RCUThread *rcu, Graph *g, const char *name);
 void graph_set_defined(RCUThread *rcu, Graph *g, size_t i);
