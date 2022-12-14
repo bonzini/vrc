@@ -16,12 +16,13 @@ foreach t: tests
   pyfiles += ['tests' / t]
 endforeach
 
+pytest = find_program('pytest')
 if get_option('pytest_tap')
-  test('pytest', py, args: [ '-m', 'pytest' , '--tap-stream' ],
+  test('pytest', pytest, args: [ '--tap-stream' ],
        env: testenv, protocol: 'tap',
        workdir: meson.project_build_root() / 'tests')
 else
-  test('pytest', py, args: [ '-m', 'pytest' ],
+  test('pytest', pytest,
        env: testenv,
        workdir: meson.project_build_root() / 'tests')
 endif
