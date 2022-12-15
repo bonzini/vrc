@@ -1,6 +1,5 @@
 [build-system]
-# pytest is needed here because meson.build looks for it
-requires = ["meson-python", "cython", "pytest"]
+requires = ["meson-python", "cython"]
 build-backend = "mesonpy"
 
 [project]

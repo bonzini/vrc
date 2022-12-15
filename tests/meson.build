@@ -16,27 +16,37 @@ foreach t: tests
   pyfiles += ['tests' / t]
 endforeach
 
-pytest = find_program('pytest')
-if get_option('pytest_tap')
-  test('pytest', pytest, args: [ '--benchmark-disable', '--tap-stream' ],
-       env: testenv, protocol: 'tap',
-       workdir: meson.project_build_root() / 'tests')
-else
-  test('pytest', pytest, args: ['--benchmark-disable' ],
-       env: testenv,
-       workdir: meson.project_build_root() / 'tests')
+# not required because anyway "python -m build" does not run tests
+pytest = find_program('pytest', required: false)
+if pytest.found()
+  if get_option('pytest_tap')
+    test('pytest', pytest, args: [ '--benchmark-disable', '--tap-stream' ],
+         env: testenv, protocol: 'tap',
+         workdir: meson.project_build_root() / 'tests')
+  else
+    test('pytest', pytest, args: ['--benchmark-disable' ],
+         env: testenv,
+         workdir: meson.project_build_root() / 'tests')
+  endif
+  benchmark('pytest', pytest, args: ['--benchmark-only' ],
+            verbose: true,
+            env: testenv,
+            workdir: meson.project_build_root() / 'tests')
 endif
-benchmark('pytest', pytest, args: ['--benchmark-only' ],
-          verbose: true,
-          env: testenv,
-          workdir: meson.project_build_root() / 'tests')
 
-test('flake8', find_program('flake8'), args: pyfiles,
-     env: testenv,
-     workdir: meson.project_source_root())
-test('mypy', find_program('mypy'), args: [ '-p', 'vrc', '-p', 'tests' ],
-     env: testenv,
-     workdir: meson.project_source_root())
+flake8 = find_program('flake8', required: false)
+if flake8.found()
+  test('flake8', flake8, args: pyfiles,
+       env: testenv,
+       workdir: meson.project_source_root())
+endif
+
+mypy = find_program('flake8', required: false)
+if mypy.found()
+  test('mypy', mypy, args: [ '-p', 'vrc', '-p', 'tests' ],
+       env: testenv,
+       workdir: meson.project_source_root())
+endif
 
 cpptests = [
   'conc_array_test',
