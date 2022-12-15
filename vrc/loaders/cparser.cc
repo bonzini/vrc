@@ -31,16 +31,12 @@ typedef enum CXChildVisitResult VisitorFunc(CXCursor cursor, CXCursor parent, Vi
 
 void add_external_node(VisitorState *state)
 {
-    std::lock_guard guard{state->t};
-
     graph_add_external_node(&state->t, state->g,
                             clang_getCString(state->current_function));
 }
 
 void add_node(VisitorState *state, CXCursor c)
 {
-    std::lock_guard guard{state->t};
-
     size_t i = graph_add_external_node(&state->t, state->g,
                                        clang_getCString(state->current_function));
     graph_set_defined(&state->t, state->g, i);
@@ -57,8 +53,6 @@ void add_node(VisitorState *state, CXCursor c)
 
 void add_edge(VisitorState *state, CXCursor target, bool is_call)
 {
-    std::lock_guard guard{state->t};
-
     CXString target_str = clang_getCursorSpelling(target);
 
     verbose_print(state, "found %s to %s",

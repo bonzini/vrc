@@ -31,7 +31,7 @@ public:
 
     void lock() {
         if (_depth++ > 0) {
-            return;
+            std::abort();
         }
 
         // Ordered by fence below.  Write _period before any read
@@ -42,9 +42,7 @@ public:
     }
 
     void unlock() {
-        if (--_depth > 0) {
-            return;
-        }
+        --_depth;
         _period.store(0, std::memory_order_release);
         std::atomic_thread_fence(std::memory_order_seq_cst);
 
