@@ -604,6 +604,8 @@ class OutputCommand(VRCCommand):
 
 
 class PathsCommand(VRCCommand):
+    """Queries callgraph paths using a regular expression language."""
+
     NAME = ('paths', )
 
     @classmethod
