@@ -10,16 +10,21 @@
 # (at your option) any later version.
 
 import dataclasses
+import sys
 import typing
 
+_dataclass_args = {} \
+    if sys.version_info < (3, 10) \
+    else {'slots': True}
 
-@dataclasses.dataclass
+
+@dataclasses.dataclass(**_dataclass_args)
 class PathElement:
     value: str
     next: typing.Optional['PathElement'] = None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(**_dataclass_args)
 class PathIterator(typing.Iterator[str]):
     curr: typing.Optional[PathElement]
 
@@ -31,6 +36,7 @@ class PathIterator(typing.Iterator[str]):
         return value
 
 
+@dataclasses.dataclass(**_dataclass_args)
 class Path:
     first: typing.Optional['PathElement'] = None
 
