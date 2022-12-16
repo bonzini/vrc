@@ -41,7 +41,7 @@ if flake8.found()
        workdir: meson.project_source_root())
 endif
 
-mypy = find_program('flake8', required: false)
+mypy = find_program('mypy', required: false)
 if mypy.found()
   test('mypy', mypy, args: [ '-p', 'vrc', '-p', 'tests' ],
        env: testenv,
