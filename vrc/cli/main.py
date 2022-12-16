@@ -87,7 +87,7 @@ class SourceCommand(VRCCommand):
             try:
                 args = PARSER.parse_args(argv)
                 try:
-                    args.cmdclass().run(args)
+                    args.cmdclass().execute(args)
                 except (ParseError, ResolutionError) as e:
                     print(e.message, file=sys.stderr)
                     if exit_first:

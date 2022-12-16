@@ -29,6 +29,11 @@ import typing
 
 GRAPH = Graph()
 
+VALID_OPTIONS = {
+    'timing': 'Show execution time after every command.',
+}
+_OPTIONS = {key: False for key in VALID_OPTIONS.keys()}
+
 
 @contextmanager
 def open_unlink_on_error(filename: str) -> typing.Iterator[typing.TextIO]:
@@ -120,6 +125,19 @@ class VRCCommand:
 
     def run(self, args: argparse.Namespace) -> None:
         pass
+
+    def execute(self, args: argparse.Namespace) -> None:
+        from resource import getrusage, RUSAGE_SELF
+        import time
+
+        r1 = getrusage(RUSAGE_SELF)
+        t1 = time.monotonic()
+        self.run(args)
+        r2 = getrusage(RUSAGE_SELF)
+        t2 = time.monotonic()
+        if _OPTIONS['timing']:
+            print('wall {:.3f}s  user {:.3f}s   sys {:.3f}s'
+                  .format(t2 - t1, r2.ru_utime - r1.ru_utime, r2.ru_stime - r1.ru_stime))
 
 
 class ChdirCommand(VRCCommand):
@@ -611,3 +629,26 @@ class PathsCommand(VRCCommand):
         except KeyboardInterrupt:
             print("Interrupt", file=sys.stderr)
             return
+
+
+class EnableCommand(VRCCommand):
+    """Enable/disable various CLI options.  Without any arguments,
+       the state of the options is shown."""
+
+    NAME = ('enable', 'disable', )
+
+    @classmethod
+    def args(self, parser: argparse.ArgumentParser) -> None:
+        for k, v in VALID_OPTIONS.items():
+            parser.add_argument(f"--{k}", action="store_true", help=v)
+
+    def run(self, args: argparse.Namespace) -> None:
+        value = (args.cmd == 'enable')
+        n = 0
+        for i in VALID_OPTIONS.keys():
+            if getattr(args, i):
+                _OPTIONS[i] = value
+                n += 1
+        if not n:
+            for k, v in _OPTIONS.items():
+                print(f"{k}: {v}")
