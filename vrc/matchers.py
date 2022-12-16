@@ -11,9 +11,9 @@ from .graph import GraphMixin
 
 
 class Matcher(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
     def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
-        func = self.as_callable(g)
-        return (node for node in g.all_nodes(True) if func(node))
+        pass
 
     @abc.abstractmethod
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
@@ -32,8 +32,14 @@ class MatchByName(Matcher):
         return self.node.__eq__
 
 
+class FuncMatcher(Matcher):
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
+        func = self.as_callable(g)
+        return (node for node in g.all_nodes(True) if func(node))
+
+
 @dataclasses.dataclass
-class MatchByRegex(Matcher):
+class MatchByRegex(FuncMatcher):
     pat: re.Pattern[str]
 
     def __init__(self, regex: str):
@@ -41,17 +47,6 @@ class MatchByRegex(Matcher):
 
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         return lambda x: bool(self.pat.search(x))
-
-
-@dataclasses.dataclass
-class MatchLabel(Matcher):
-    label: str
-
-    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
-        yield from g.labeled_nodes(self.label)
-
-    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
-        return lambda x: x in g.labeled_nodes(self.label)
 
 
 @dataclasses.dataclass
@@ -154,8 +149,22 @@ class MatchOr(Matcher):
         return lambda x: any((c(x) for c in callables))
 
 
+class CachingMatcher(Matcher):
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
+        nodes = list(self.match_nodes_in_graph(g))
+        return nodes.__contains__
+
+
 @dataclasses.dataclass
-class MatchCallees(Matcher):
+class MatchLabel(CachingMatcher):
+    label: str
+
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
+        yield from g.labeled_nodes(self.label)
+
+
+@dataclasses.dataclass
+class MatchCallees(CachingMatcher):
     matcher: Matcher
 
     def __init__(self, matcher: Matcher):
@@ -169,13 +178,9 @@ class MatchCallees(Matcher):
 
         yield from nodes
 
-    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
-        nodes = list(self.match_nodes_in_graph(g))
-        return lambda x: x in nodes
-
 
 @dataclasses.dataclass
-class MatchCallers(Matcher):
+class MatchCallers(CachingMatcher):
     matcher: Matcher
 
     def __init__(self, matcher: Matcher):
@@ -188,10 +193,6 @@ class MatchCallers(Matcher):
             nodes.update(g.callers(n, False))
 
         yield from nodes
-
-    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
-        nodes = list(self.match_nodes_in_graph(g))
-        return lambda x: x in nodes
 
 
 Parser = typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]
