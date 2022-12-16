@@ -225,7 +225,7 @@ class LoadCommand(VRCCommand):
                             help="Report progress while parsing")
         parser.add_argument("--force", action="store_true",
                             help="Do not use cached result")
-        parser.add_argument("--loader", default="rtl",
+        parser.add_argument("--loader", default="clang",
                             help="Pick how to analyze the translation unit")
         parser.add_argument("files", metavar="FILE", nargs="+",
                             help="Dump or object file to be loaded")
