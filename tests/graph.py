@@ -362,31 +362,28 @@ class TestPath:
         p.append("a")
         assert list(p) == ["a"]
 
-        p.append("b")
+        to_a = p.append("b")
         assert list(p) == ["b", "a"]
 
-        p.pop()
+        p.first = to_a
         assert list(p) == ["a"]
 
-        p.append("b")
-        p.append("c")
+        to_a = p.append("b")
+        to_b = p.append("c")
         save_p = iter(p)
-        p.pop()
+        p.first = to_b
         assert list(p) == ["b", "a"]
         p.append("d")
         assert list(save_p) == ["c", "b", "a"]
         assert list(p) == ["d", "b", "a"]
-        p.pop()
-        p.pop()
+        p.first = to_a
         assert list(p) == ["a"]
-        p.pop()
+        p.first = None
         assert list(p) == []
 
         p.append("b")
         p.append("c")
         assert list(p) == ["c", "b"]
-        p.pop()
-        p.pop()
 
     @staticmethod
     def graph_for_paths(graph_class: typing.Type[GraphMixin]) -> GraphMixin:

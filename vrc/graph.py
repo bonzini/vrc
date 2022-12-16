@@ -309,13 +309,13 @@ class GraphMixin(metaclass=abc.ABCMeta):
             name = self._name_by_index(node)
             next_state = a.advance(state, name)
             if not a.is_failure(next_state):
-                path.append(name)
+                old = path.append(name)
                 if a.is_final(next_state):
                     yield path
                 for callee in self._get_callees(node):
                     if callee not in visited and self._filter_edge(node, callee, ref_ok):
                         yield from visit(callee, next_state)
-                path.pop()
+                path.first = old
             visited.remove(node)
 
         for node in range(0, self.node_count()):

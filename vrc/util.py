@@ -38,16 +38,12 @@ class PathIterator(typing.Iterator[str]):
 
 @dataclasses.dataclass(**_dataclass_args)
 class Path:
-    first: typing.Optional['PathElement'] = None
+    first: typing.Optional[PathElement] = None
 
-    def append(self, value: str) -> None:
-        new_element = PathElement(value)
-        new_element.next = self.first
-        self.first = new_element
-
-    def pop(self) -> None:
-        assert self.first is not None
-        self.first = self.first.next
+    def append(self, value: str) -> typing.Optional[PathElement]:
+        old = self.first
+        self.first = PathElement(value, old)
+        return old
 
     def __iter__(self) -> typing.Iterator[str]:
         return PathIterator(self.first)
