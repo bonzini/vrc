@@ -9,7 +9,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-from .cli.main import main
+from vrc.cli.main import main
 
 
 if __name__ == "__main__":

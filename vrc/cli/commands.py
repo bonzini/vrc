@@ -26,12 +26,15 @@ import subprocess
 import sys
 import typing
 
-
 GRAPH = Graph()
 
 VALID_OPTIONS = {
     'timing': 'Show execution time after every command.',
 }
+
+if 'scalene' in sys.modules:
+    VALID_OPTIONS['profiling'] = 'Enable scalene profiler'
+
 _OPTIONS = {key: False for key in VALID_OPTIONS.keys()}
 
 
@@ -132,12 +135,20 @@ class VRCCommand:
 
         r1 = getrusage(RUSAGE_SELF)
         t1 = time.monotonic()
-        self.run(args)
-        r2 = getrusage(RUSAGE_SELF)
-        t2 = time.monotonic()
-        if _OPTIONS['timing']:
-            print('wall {:.3f}s  user {:.3f}s   sys {:.3f}s'
-                  .format(t2 - t1, r2.ru_utime - r1.ru_utime, r2.ru_stime - r1.ru_stime))
+        if _OPTIONS.get('profiling', False):
+            from scalene import scalene_profiler             # type: ignore
+            scalene_profiler.start()
+        try:
+            self.run(args)
+        finally:
+            if _OPTIONS.get('profiling', False):
+                from scalene import scalene_profiler
+                scalene_profiler.stop()
+            r2 = getrusage(RUSAGE_SELF)
+            t2 = time.monotonic()
+            if _OPTIONS['timing']:
+                print('wall {:.3f}s  user {:.3f}s   sys {:.3f}s'
+                      .format(t2 - t1, r2.ru_utime - r1.ru_utime, r2.ru_stime - r1.ru_stime))
 
 
 class ChdirCommand(VRCCommand):
