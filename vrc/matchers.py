@@ -19,6 +19,9 @@ class Matcher(metaclass=abc.ABCMeta):
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         pass
 
+    def optimize(self) -> 'Matcher':
+        return self
+
 
 @dataclasses.dataclass
 class MatchByName(Matcher):
@@ -50,35 +53,49 @@ class MatchByRegex(FuncMatcher):
 
 
 @dataclasses.dataclass
-class MatchWrapper(Matcher):
-    matcher: Matcher
+class MatchAnd2(FuncMatcher):
+    lhs: Matcher
+    rhs: Matcher
 
-    def __new__(cls, matcher: Matcher) -> Matcher:   # type: ignore
-        if isinstance(matcher, MatchWrapper):
-            assert not isinstance(matcher.matcher, MatchWrapper)
-            return matcher.matcher
-        else:
-            return super().__new__(cls)
-
-    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
-        return self.matcher.match_nodes_in_graph(g)
+    def __init__(self, lhs: Matcher, rhs: Matcher):
+        self.lhs = lhs
+        self.rhs = rhs
 
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
-        return self.matcher.as_callable(g)
+        l_func = self.lhs.as_callable(g)
+        r_func = self.rhs.as_callable(g)
+        return lambda x: l_func(x) and r_func(x)
+
+
+@dataclasses.dataclass
+class MatchOr2(FuncMatcher):
+    lhs: Matcher
+    rhs: Matcher
+
+    def __init__(self, lhs: Matcher, rhs: Matcher):
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def as_callable(self, g: GraphMixin) -> nfa.Matcher:
+        l_func = self.lhs.as_callable(g)
+        r_func = self.rhs.as_callable(g)
+        return lambda x: l_func(x) or r_func(x)
 
 
 @dataclasses.dataclass
 class MatchAnd(Matcher):
-    matchers: typing.Iterable[Matcher]
-
-    def __new__(cls, *matchers: Matcher) -> Matcher:   # type: ignore
-        if len(matchers) == 1:
-            return MatchWrapper(matchers[0])
-        else:
-            return super().__new__(cls)
+    matchers: typing.Sequence[Matcher]
 
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
+
+    def optimize(self) -> Matcher:
+        if len(self.matchers) == 1:
+            return self.matchers[0]
+        elif len(self.matchers) == 2:
+            return MatchAnd2(*self.matchers)
+        else:
+            return self
 
     def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         i = iter(self.matchers)
@@ -101,12 +118,11 @@ class MatchAnd(Matcher):
 class MatchNot(Matcher):
     matcher: Matcher
 
-    def __new__(cls, matcher: Matcher) -> Matcher:   # type: ignore
-        if isinstance(matcher, MatchNot):
-            assert not isinstance(matcher.matcher, MatchNot)
-            return matcher.matcher
+    def optimize(self) -> Matcher:
+        if isinstance(self.matcher, MatchNot):
+            return self.matcher.matcher
         else:
-            return super().__new__(cls)
+            return self
 
     def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         result = set(g.all_nodes(True))
@@ -121,16 +137,18 @@ class MatchNot(Matcher):
 
 @dataclasses.dataclass
 class MatchOr(Matcher):
-    matchers: typing.Iterable[Matcher]
-
-    def __new__(cls, *matchers: Matcher) -> Matcher:   # type: ignore
-        if len(matchers) == 1:
-            return MatchWrapper(matchers[0])
-        else:
-            return super().__new__(cls)
+    matchers: typing.Sequence[Matcher]
 
     def __init__(self, *matchers: Matcher):
         self.matchers = matchers
+
+    def optimize(self) -> Matcher:
+        if len(self.matchers) == 1:
+            return self.matchers[0]
+        elif len(self.matchers) == 2:
+            return MatchOr2(*self.matchers)
+        else:
+            return self
 
     def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
         i = iter(self.matchers)
@@ -255,7 +273,7 @@ def _node_matcher_parser() -> Parser:
     Outside = Common | Word.value(MatchByName)
     Outside = Terminal('!').then(Outside).value(MatchNot) | Outside
     Outside = Outside.then(Operators, reducer=lambda x, y: y(x))
-    return Spaces.then(Outside)
+    return Spaces.then(Outside).value(lambda x: x.optimize())
 
 
 Node = _node_matcher_parser()

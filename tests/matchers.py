@@ -38,6 +38,10 @@ class TestMatcher:
         for node in g.all_nodes(True):
             assert c(node) == (node in results)
 
+        c = m.optimize().as_callable(g)
+        for node in g.all_nodes(True):
+            assert c(node) == (node in results)
+
     def do_parse_test(self, g: GraphMixin, s: str, results: list[str]) -> None:
         parse_result = parse_nodespec(s)
         self.do_test(g, parse_result, results)
