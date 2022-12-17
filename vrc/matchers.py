@@ -102,12 +102,11 @@ class MatchAnd(Matcher):
         try:
             nodes = set(next(i).match_nodes_in_graph(g))
         except StopIteration:
-            yield from g.all_nodes(True)
-            return
+            return g.all_nodes(True)
 
         for matcher in i:
             nodes = nodes.intersection(matcher.match_nodes_in_graph(g))
-        yield from nodes
+        return iter(nodes)
 
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         callables = [matcher.as_callable(g) for matcher in self.matchers]
@@ -115,7 +114,7 @@ class MatchAnd(Matcher):
 
 
 @dataclasses.dataclass
-class MatchNot(Matcher):
+class MatchNot(FuncMatcher):
     matcher: Matcher
 
     def optimize(self) -> Matcher:
@@ -123,12 +122,6 @@ class MatchNot(Matcher):
             return self.matcher.matcher
         else:
             return self
-
-    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
-        result = set(g.all_nodes(True))
-        for node in self.matcher.match_nodes_in_graph(g):
-            result.remove(node)
-        yield from result
 
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         c = self.matcher.as_callable(g)
@@ -155,12 +148,12 @@ class MatchOr(Matcher):
         try:
             nodes = set(next(i).match_nodes_in_graph(g))
         except StopIteration:
-            return
+            return iter(())
 
         for matcher in i:
             nodes.update(matcher.match_nodes_in_graph(g))
 
-        yield from nodes
+        return iter(nodes)
 
     def as_callable(self, g: GraphMixin) -> nfa.Matcher:
         callables = [matcher.as_callable(g) for matcher in self.matchers]
@@ -178,7 +171,7 @@ class MatchLabel(CachingMatcher):
     label: str
 
     def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
-        yield from g.labeled_nodes(self.label)
+        return iter(g.labeled_nodes(self.label))
 
 
 @dataclasses.dataclass
@@ -194,7 +187,7 @@ class MatchCallees(CachingMatcher):
         for n in self.matcher.match_nodes_in_graph(g):
             nodes.update(g.callees(n, False, False))
 
-        yield from nodes
+        return iter(nodes)
 
 
 @dataclasses.dataclass
@@ -210,7 +203,7 @@ class MatchCallers(CachingMatcher):
         for n in self.matcher.match_nodes_in_graph(g):
             nodes.update(g.callers(n, False))
 
-        yield from nodes
+        return iter(nodes)
 
 
 Parser = typing.Callable[[str], typing.Union[compynator.core.Success, compynator.core.Failure]]
