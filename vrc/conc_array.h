@@ -85,7 +85,8 @@ bool ConcurrentArray<T, Owner>::resize(Owner &owner, std::size_t expected_capaci
 
     synchronize_rcu();
 
-    delete[] old_contents;
+    Owner::release(old_contents, old_capacity);
+    Owner::destroy(old_contents);
     return true;
 }
 
@@ -119,19 +120,30 @@ struct ListEntry : ItemTraits<T> {
     ItemTraits<T>::value_type value;
 
     ListEntry(): value() {}
+
     ~ListEntry() {
         ItemTraits<T>::delete_value(value);
     }
 
+    ListEntry& operator=(ListEntry &e) {
+        ItemTraits<T>::delete_value(value);
+        value = e.value;
+        return *this;
+    }
+
     ListEntry& operator=(ListEntry &&e) {
-       value = std::move(e.value);
-       e.value = typename ItemTraits<T>::value_type();
-       return *this;
+        ItemTraits<T>::delete_value(value);
+        value = std::move(e.value);
+        e.value = typename ItemTraits<T>::value_type();
+        return *this;
+    }
+
+    void release() {
+       value = typename ItemTraits<T>::value_type();
     }
 
 private:
     ListEntry(ListEntry &e) = delete;
-    ListEntry& operator=(ListEntry &e) = delete;
 };
 
 template <typename T>
@@ -166,6 +178,7 @@ private:
     friend class ConcurrentArray<ListEntry<T>, ConcurrentList<T>>;
     static ListEntry<T>* alloc(std::size_t n);
     static void destroy(ListEntry<T> *contents);
+    static void release(ListEntry<T> *contents, std::size_t capacity);
     void copy(ListEntry<T>* dest, ListEntry<T>* src, std::size_t dest_count, std::size_t src_count);
 
     ConcurrentArray<ListEntry<T>, ConcurrentList<T>> contents{};
@@ -184,10 +197,18 @@ void ConcurrentList<T>::destroy(ListEntry<T> *contents)
 }
 
 template <typename T>
+void ConcurrentList<T>::release(ListEntry<T> *contents, std::size_t capacity)
+{
+    for (std::size_t i = 0; i < capacity; i++) {
+        contents[i].release();
+    }
+}
+
+template <typename T>
 void ConcurrentList<T>::copy(ListEntry<T> *dest, ListEntry<T> *src, std::size_t dest_count, std::size_t src_count)
 {
     for (std::size_t i = 0; i < src_count; i++) {
-        dest[i] = std::move(src[i]);
+        dest[i] = src[i];
     }
 }
 

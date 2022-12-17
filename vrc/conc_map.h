@@ -17,22 +17,33 @@ struct MapEntry : ItemTraits<V> {
         ItemTraits<V>::delete_value(value);
     }
 
+    MapEntry& operator=(MapEntry &e) {
+        key.store(e.key.load(std::memory_order_relaxed),
+                  std::memory_order_relaxed);
+        value = e.value;
+        return *this;
+    }
+
     MapEntry& operator=(MapEntry &&e) {
-       key.store(e.key.load(std::memory_order_relaxed),
-                 std::memory_order_relaxed);
-       e.key.store(NULL, std::memory_order_relaxed);
-       value = std::move(e.value);
-       e.value = typename ItemTraits<V>::value_type();
-       return *this;
+        key.store(e.key.load(std::memory_order_relaxed),
+                  std::memory_order_relaxed);
+        e.key.store(NULL, std::memory_order_relaxed);
+        value = std::move(e.value);
+        e.value = typename ItemTraits<V>::value_type();
+        return *this;
     }
 
     operator bool() {
         return key.load(std::memory_order_relaxed) != NULL;
     }
 
+    void release() {
+        key.store(NULL, std::memory_order_relaxed);
+        value = typename ItemTraits<V>::value_type();
+    }
+
 private:
     MapEntry(MapEntry &e) = delete;
-    MapEntry& operator=(MapEntry &e) = delete;
 };
 
 
@@ -98,6 +109,7 @@ private:
     friend class ConcurrentArray<MapEntry<V>, ConcurrentStringMap<V>>;
     static MapEntry<V>* alloc(std::size_t capacity);
     static void destroy(MapEntry<V> *contents);
+    static void release(MapEntry<V> *contents, std::size_t capacity);
     void copy(MapEntry<V>* dest, MapEntry<V>* src, std::size_t dest_count, std::size_t src_count);
 
     ConcurrentArray<MapEntry<V>, ConcurrentStringMap<V>> contents{};
@@ -192,6 +204,14 @@ void ConcurrentStringMap<V>::destroy(MapEntry<V> *contents)
 }
 
 template <typename V>
+void ConcurrentStringMap<V>::release(MapEntry<V> *contents, std::size_t capacity)
+{
+    for (std::size_t i = 0; i < capacity; i++) {
+        contents[i].release();
+    }
+}
+
+template <typename V>
 void ConcurrentStringMap<V>::copy(MapEntry<V> *dest, MapEntry<V> *src,
                                 std::size_t dest_count, std::size_t src_count)
 {
@@ -205,8 +225,8 @@ void ConcurrentStringMap<V>::copy(MapEntry<V> *dest, MapEntry<V> *src,
                     break;
                 }
             };
-	    // No concurrent accesses, and ConcurrentArray takes care of ordering
-            dest[i] = std::move(e);
+            // No concurrent accesses, and ConcurrentArray takes care of ordering
+            dest[i] = e;
         }
     }
 }

@@ -13,9 +13,6 @@ struct HashDefault;
 template <> struct HashDefault<size_t> {
     static const size_t default_value = -1;
 };
-template <typename T> struct HashDefault<T *> {
-    static const T *default_value = nullptr;
-};
 
 template <typename T>
 class ConcurrentHashSet {
@@ -37,6 +34,7 @@ private:
     static const T default_value = HashDefault<T>::default_value;
     static std::atomic<T>* alloc(std::size_t capacity);
     static void destroy(std::atomic<T> *contents);
+    static void release(std::atomic<T> *contents, std::size_t capacity);
     void copy(std::atomic<T>* dest, std::atomic<T>* src, std::size_t dest_count, std::size_t src_count);
 
     size_t find_index(T t, std::size_t i);
@@ -84,6 +82,12 @@ template <typename T>
 void ConcurrentHashSet<T>::destroy(std::atomic<T> *contents)
 {
     delete[] contents;
+}
+
+template <typename T>
+void ConcurrentHashSet<T>::release(std::atomic<T> *contents, std::size_t capacity)
+{
+    // for now the only valid keys are ints, so nothing to do
 }
 
 template <typename T>
