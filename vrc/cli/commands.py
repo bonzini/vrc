@@ -13,7 +13,7 @@ import argparse
 from . import serialize_graph
 from ..matchers import MatchAnd, MatchLabel, parse_nodespec, parse_pathspec
 from ..graph import Graph
-from ..loaders import TranslationUnit, get_loaders
+from ..loaders import TranslationUnit, get_loaders, default_loader
 from collections import defaultdict
 from contextlib import contextmanager
 import glob
@@ -225,7 +225,7 @@ class LoadCommand(VRCCommand):
                             help="Report progress while parsing")
         parser.add_argument("--force", action="store_true",
                             help="Do not use cached result")
-        parser.add_argument("--loader", default="rtl",
+        parser.add_argument("--loader", default=default_loader(),
                             help="Pick how to analyze the translation unit")
         parser.add_argument("files", metavar="FILE", nargs="+",
                             help="Dump or object file to be loaded")
