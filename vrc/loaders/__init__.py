@@ -147,6 +147,14 @@ class ClangLoader(Loader, metaclass=abc.ABCMeta):
             source(f, False)
 
 
+def default_loader() -> str:
+    from .registry import LOADERS
+    for i in ['clang', 'pyclang', 'rtl']:
+        if i in LOADERS:
+            return i
+    assert False
+
+
 def get_loaders() -> typing.Mapping[str, typing.Type[Loader]]:
     from .registry import LOADERS
     return LOADERS
