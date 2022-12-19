@@ -79,9 +79,9 @@ void add_label(VisitorState *state, CXCursor attr)
     clang_disposeString(attr_str);
 }
 
-static enum CXChildVisitResult visit(VisitorState *state,
-                                     CXCursor c,
-                                     VisitorFunc *func)
+static enum CXChildVisitResult visit(CXCursor c,
+                                     VisitorFunc *func,
+                                     VisitorState *state)
 {
     unsigned result = clang_visitChildren(c, (CXCursorVisitor) func, state);
     return result ? CXChildVisit_Break : CXChildVisit_Continue;
@@ -147,10 +147,10 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
             if (clang_isCursorDefinition(c) && !clang_Location_isInSystemHeader(loc)) {
                 verbose_print(state, "found function definition");
                 add_node(state, c);
-                result = visit(state, c, visit_function_body);
+                result = visit(c, visit_function_body, state);
             } else {
                 verbose_print(state, "found function declaration");
-                result = visit(state, c, visit_function_decl);
+                result = visit(c, visit_function_decl, state);
             }
             clang_disposeString(state->current_function);
             state->current_function = save_current_function;
@@ -204,7 +204,7 @@ void build_graph(const char *filename, const char *const *args, int num_args,
     }
 
     VisitorState state{g, filename, verbose};
-    visit(&state, clang_getTranslationUnitCursor(tu), visit_clang_tu);
+    visit(clang_getTranslationUnitCursor(tu), visit_clang_tu, &state);
 
     clang_disposeTranslationUnit(tu);
     clang_disposeIndex(idx);
