@@ -18,8 +18,6 @@ typedef struct VisitorState {
     RCUThread t{};
 } VisitorState;
 
-typedef enum CXChildVisitResult VisitorFunc(CXCursor cursor, CXCursor parent, VisitorState *state);
-
 #define verbose_print(s, fmt, ...) do {                                     \
     if ((s)->verbose) {                                                     \
         fprintf(stderr, "%s%s%s: " fmt "\n",                                \
@@ -79,12 +77,51 @@ void add_label(VisitorState *state, CXCursor attr)
     clang_disposeString(attr_str);
 }
 
-static enum CXChildVisitResult visit(CXCursor c,
-                                     VisitorFunc *func,
-                                     VisitorState *state)
+// needed because functions cannot be partially specialized
+template<typename F, typename... Arg> struct Visitor {
+    static enum CXChildVisitResult visit(CXCursor c, F func, Arg&&... arg);
+};
+
+template<typename F>
+struct Visitor<F>
 {
-    unsigned result = clang_visitChildren(c, (CXCursorVisitor) func, state);
-    return result ? CXChildVisit_Break : CXChildVisit_Continue;
+    static enum CXChildVisitResult actual_visitor(CXCursor cursor, CXCursor parent, CXClientData client_data) {
+        F *f = (F *)client_data;
+        return (*f)(cursor, parent);
+    }
+
+    static enum CXChildVisitResult visit(CXCursor c, F func) {
+        unsigned result = clang_visitChildren(c, &Visitor<F>::actual_visitor, &func);
+        return result ? CXChildVisit_Break : CXChildVisit_Continue;
+    }
+};
+
+template<typename F, typename T>
+struct Visitor<F, T*&>
+{
+    static enum CXChildVisitResult visit(CXCursor c, F func, T *arg) {
+        typedef CXChildVisitResult (*VisitorFunc)(CXCursor, CXCursor, T *);
+
+        unsigned result = clang_visitChildren(c, (CXCursorVisitor) (VisitorFunc) func, arg);
+        return result ? CXChildVisit_Break : CXChildVisit_Continue;
+    }
+};
+
+template<typename F, typename T>
+struct Visitor<F, T*>
+{
+    static enum CXChildVisitResult visit(CXCursor c, F func, T *arg) {
+        typedef CXChildVisitResult (*VisitorFunc)(CXCursor, CXCursor, T *);
+
+        unsigned result = clang_visitChildren(c, (CXCursorVisitor) (VisitorFunc) func, arg);
+        return result ? CXChildVisit_Break : CXChildVisit_Continue;
+    }
+};
+
+template<typename F, typename... Arg>
+static enum CXChildVisitResult visit(CXCursor c, F func, Arg&&... arg)
+{
+    return Visitor<F, Arg...>::visit(c, func, std::forward<Arg>(arg)...);
 }
 
 enum CXChildVisitResult visit_function_decl(CXCursor c, CXCursor parent, VisitorState *state)
