@@ -124,28 +124,14 @@ static enum CXChildVisitResult visit(CXCursor c, F func, Arg&&... arg)
     return Visitor<F, Arg...>::visit(c, func, std::forward<Arg>(arg)...);
 }
 
-enum CXChildVisitResult visit_function_decl(CXCursor c, CXCursor parent, VisitorState *state)
-{
-    enum CXChildVisitResult result = CXChildVisit_Recurse;
-
-    switch (c.kind) {
-    case CXCursor_AnnotateAttr:
-        add_label(state, c);
-        break;
-
-    default:
-        break;
-    }
-    return result;
-}
-
 enum CXChildVisitResult visit_function_body(CXCursor c, CXCursor parent, VisitorState *state)
 {
     enum CXChildVisitResult result = CXChildVisit_Recurse;
 
     switch (c.kind) {
     case CXCursor_AnnotateAttr:
-        result = visit_function_decl(c, parent, state);
+        add_label(state, c);
+        return CXChildVisit_Break;
 
     case CXCursor_CallExpr:
         {
@@ -187,7 +173,14 @@ enum CXChildVisitResult visit_clang_tu(CXCursor c, CXCursor parent, VisitorState
                 result = visit(c, visit_function_body, state);
             } else {
                 verbose_print(state, "found function declaration");
-                result = visit(c, visit_function_decl, state);
+                result = visit(c, [state](CXCursor c, CXCursor parent) {
+                    if (c.kind == CXCursor_AnnotateAttr) {
+                        add_label(state, c);
+                        return CXChildVisit_Break;
+                    } else {
+                        return CXChildVisit_Recurse;
+                    }
+                });
             }
             clang_disposeString(state->current_function);
             state->current_function = save_current_function;
