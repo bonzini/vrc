@@ -19,7 +19,8 @@ import typing
 class Node:
     name: str
     callers: set[int]
-    callees: dict[int, bool]
+    callees: set[int]
+    refs: set[int]
     username: typing.Optional[str] = None
     file: typing.Optional[str] = None
     line: typing.Optional[int] = None
@@ -29,7 +30,8 @@ class Node:
         super().__init__()
         self.name = name
         self.callers = set()
-        self.callees = dict()
+        self.callees = set()
+        self.refs = set()
 
     def format(self, include_location: bool) -> str:
         n = self.username or self.name
@@ -90,8 +92,12 @@ class Graph:
     def _add_edge(self, i: int, j: int, is_call: bool) -> None:
         src = self.nodes_by_index[i]
         # A "ref" edge does not override a "call" edge
-        if is_call or j not in src.callees:
-            src.callees[j] = is_call
+        if is_call:
+            if j in src.refs:
+                src.refs.remove(j)
+            src.callees.add(j)
+        elif j not in src.callees:
+            src.refs.add(j)
 
         self.nodes_by_index[j].callers.add(i)
 
@@ -109,7 +115,8 @@ class Graph:
         return self.nodes_by_index[i].callers
 
     def _get_callees(self, i: int) -> typing.Iterable[int]:
-        return self.nodes_by_index[i].callees.keys()
+        yield from iter(self.nodes_by_index[i].callees)
+        yield from iter(self.nodes_by_index[i].refs)
 
     def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[int, str]]:
         i = self.nodes_by_username.get(name, None)
@@ -126,15 +133,12 @@ class Graph:
         return self.nodes_by_index[i].external
 
     def _has_edge(self, src: int, dest: int, ref_ok: bool) -> bool:
-        e = self.nodes_by_index[src].callees.get(dest, None)
-        if e is not False:
-            # nonexistant or call edge
-            return e is True
-        # ref edge
-        return ref_ok and not self.nodes_by_index[dest].external
+        if dest in self.nodes_by_index[src].callees:
+            return True
+        return ref_ok and not self.nodes_by_index[dest].external and dest in self.nodes_by_index[src].refs
 
     def _has_call_edge(self, src: int, dest: int) -> bool:
-        return self.nodes_by_index[src].callees.get(dest, False)
+        return dest in self.nodes_by_index[src].callees
 
     def all_files(self) -> typing.Iterable[str]:
         return iter(self.nodes_by_file.keys())
