@@ -21,6 +21,9 @@ _dataclass_args = {} \
 @dataclasses.dataclass(**_dataclass_args)
 class PathElement:
     value: str
+    caller: int
+    callees: typing.Iterator[int]
+    state: typing.Any
     next: typing.Optional['PathElement'] = None
 
 
@@ -40,10 +43,8 @@ class PathIterator(typing.Iterator[str]):
 class Path:
     first: typing.Optional[PathElement] = None
 
-    def append(self, value: str) -> typing.Optional[PathElement]:
-        old = self.first
-        self.first = PathElement(value, old)
-        return old
+    def append(self, value: str, caller: int, callees: typing.Iterator[int], state: typing.Any) -> None:
+        self.first = PathElement(value, caller, callees, state, self.first)
 
     def __iter__(self) -> typing.Iterator[str]:
         return PathIterator(self.first)

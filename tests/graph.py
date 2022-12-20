@@ -359,30 +359,31 @@ class TestPath:
         p = Path()
         assert list(p) == []
 
-        p.append("a")
+        p.append("a", 0, iter([]), 123)
         assert list(p) == ["a"]
 
-        to_a = p.append("b")
+        p.append("b", 0, iter([]), 123)
         assert list(p) == ["b", "a"]
 
-        p.first = to_a
+        p.first = p.first.next                   # type: ignore
         assert list(p) == ["a"]
 
-        to_a = p.append("b")
-        to_b = p.append("c")
+        p.append("b", 0, iter([]), 123)
+        p.append("c", 0, iter([]), 123)
         save_p = iter(p)
-        p.first = to_b
+        p.first = p.first.next                   # type: ignore
         assert list(p) == ["b", "a"]
-        p.append("d")
+        p.append("d", 0, iter([]), 123)
         assert list(save_p) == ["c", "b", "a"]
         assert list(p) == ["d", "b", "a"]
-        p.first = to_a
+        p.first = p.first.next                   # type: ignore
+        p.first = p.first.next                   # type: ignore
         assert list(p) == ["a"]
-        p.first = None
+        p.first = p.first.next                   # type: ignore
         assert list(p) == []
 
-        p.append("b")
-        p.append("c")
+        p.append("b", 0, iter([]), 123)
+        p.append("c", 0, iter([]), 123)
         assert list(p) == ["c", "b"]
 
     @staticmethod

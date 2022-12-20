@@ -292,32 +292,60 @@ class GraphMixin(metaclass=abc.ABCMeta):
     def paths(self, a: Automaton[typing.Any], external_ok: bool,
               ref_ok: bool) -> typing.Iterable[typing.Iterable[str]]:
         visited: set[int] = set()
-        valid: set[int] = set()
+        callees: dict[int, list[int]] = dict()
         path = Path()
 
-        def visit(node: int, state: typing.Any) -> typing.Iterable[typing.Iterable[str]]:
-            visited.add(node)
-            if node not in valid:
-                if not self._filter_node(node, external_ok):
-                    # do not remove from visited to prune quickly on subsequent
-                    # paths. this makes failure of this test rare, so do it last
+        gen = iter(range(0, self.node_count()))
+        state = a.initial()
+        while True:
+            try:
+                while (node := next(gen)) in visited:
+                    pass
+
+            except StopIteration:
+                # pop the top item of the path
+                old = path.first
+                if not old:
                     return
-                valid.add(node)
+                node = old.caller
+                gen = old.callees
+                state = old.state
+                path.first = old.next
+                visited.remove(node)
+                continue
+
+            # validate the node being added, cache the callees if needed
+            if node not in callees:
+                if not self._filter_node(node, external_ok):
+                    # leave the node in visited to prune quickly on subsequent
+                    # paths. this makes failure of this test rare, so do it last
+                    visited.add(node)
+                    continue
+
+                callees[node] = [callee for callee in self._get_callees(node, ref_ok)
+                                 if self._filter_edge(node, callee)]
 
             name = self._name_by_index(node)
             next_state = a.advance(state, name)
-            if not a.is_failure(next_state):
-                old = path.append(name)
-                if a.is_final(next_state):
-                    yield path
-                for callee in self._get_callees(node, ref_ok):
-                    if callee not in visited and self._filter_edge(node, callee):
-                        yield from visit(callee, next_state)
-                path.first = old
-            visited.remove(node)
 
-        for node in range(0, self.node_count()):
-            yield from visit(node, a.initial())
+            # should the path be continued or dropped?
+            if not a.is_failure(next_state):
+                down = callees[node]
+                if a.is_final(next_state):
+                    path.append(name, node, gen, state)
+                    yield path
+                    if not down:
+                        path.first = path.first.next       # type: ignore
+                        continue
+                else:
+                    if not down:
+                        continue
+                    path.append(name, node, gen, state)
+
+                # stack pushed, go down the path
+                visited.add(node)
+                gen = iter(down)
+                state = next_state
 
     def reset_filter(self) -> None:
         self.omitted = set()
