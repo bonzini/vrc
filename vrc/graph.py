@@ -25,7 +25,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
     omitting_callers: set[str]    # Edges directed to these nodes are ignored
     omitting_callees: set[str]    # Edges starting from these nodes are ignored
     filter_default: bool
-    _filter_edge: typing.Callable[[int, int, bool], bool]
+    _filter_edge: typing.Callable[[int, int], bool]
 
     def __init__(self) -> None:
         super().__init__()
@@ -167,7 +167,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
         return (
             self._name_by_index(caller)
             for caller in self._get_callers(i)
-            if self._filter_node(caller, True) and self._filter_edge(caller, i, ref_ok))
+            if self._filter_node(caller, True) and self._has_edge(caller, i, ref_ok) and self._filter_edge(caller, i))
 
     def callers(self, callee: str, ref_ok: bool) -> typing.Iterator[str]:
         i, _ = self._get_node(callee)
@@ -178,7 +178,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
     def _callees(self, i: int, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
         return (self._name_by_index(callee)
                 for callee in self._get_callees(i, ref_ok)
-                if self._filter_node(callee, external_ok) and self._filter_edge(i, callee, ref_ok))
+                if self._filter_node(callee, external_ok) and self._filter_edge(i, callee))
 
     def callees(self, caller: str, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
         i, _ = self._get_node(caller)
@@ -221,19 +221,17 @@ class GraphMixin(metaclass=abc.ABCMeta):
         assert srcnode is not None
         return "call" if self._has_call_edge(srcnode, dstindex) else "ref"
 
-    def _do_filter_edge(self, caller_node: int, callee_node: int, ref_ok: bool) -> bool:
-        if self._name_by_index(caller_node) in self.omitting_callees:
-            return False
-        if self._name_by_index(callee_node) in self.omitting_callers:
-            return False
-        return self._has_edge(caller_node, callee_node, ref_ok)
+    def _do_filter_edge(self, caller_node: int, callee_node: int) -> bool:
+        return not (self._name_by_index(caller_node) in self.omitting_callees
+                    or self._name_by_index(callee_node) in self.omitting_callers)
 
     def filter_edge(self, caller: str, callee: str, ref_ok: bool) -> bool:
         caller_node, _ = self._get_node(caller)
         callee_node, _ = self._get_node(callee)
         if caller_node is None or callee_node is None:
             return False
-        return self._filter_edge(caller_node, callee_node, ref_ok)
+        return self._filter_edge(caller_node, callee_node) and \
+            self._has_edge(caller_node, callee_node, ref_ok)
 
     def _omit_node(self, name: str) -> None:
         self.omitted.add(name)
@@ -313,7 +311,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
                 if a.is_final(next_state):
                     yield path
                 for callee in self._get_callees(node, ref_ok):
-                    if callee not in visited and self._filter_edge(node, callee, ref_ok):
+                    if callee not in visited and self._filter_edge(node, callee):
                         yield from visit(callee, next_state)
                 path.first = old
             visited.remove(node)
@@ -327,7 +325,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
         self.omitting_callees = set()
         self.keep = None
         self.filter_default = True
-        self._filter_edge = self._has_edge
+        self._filter_edge = staticmethod(lambda x, y: True)
 
     def labeled_nodes(self, label: str) -> typing.Iterable[str]:
         return (self._name_by_index(i) for i in self._all_nodes_for_label(label))
