@@ -179,9 +179,15 @@ cdef class Graph:
     def _get_callers(self, i: int) -> typing.Iterable[int]:
         return self.iter_to_python(cgraph.graph_get_callers(NULL, self.g, i))
 
-    def _get_callees(self, i: int) -> typing.Iterable[int]:
+    def _get_all_callees(self, i: int) -> typing.Iterable[int]:
         yield from self.iter_to_python(cgraph.graph_get_callees(NULL, self.g, i))
         yield from self.iter_to_python(cgraph.graph_get_refs(NULL, self.g, i))
+
+    def _get_callees(self, i: int, ref_ok: bool = True) -> typing.Iterable[int]:
+        if ref_ok:
+            return self._get_all_callees(i)
+        else:
+            return self.iter_to_python(cgraph.graph_get_callees(NULL, self.g, i))
 
     def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[int, str]]:
         cdef char *string = PyUnicode_AsUTF8(name)

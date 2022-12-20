@@ -122,7 +122,8 @@ class TestVRCGraph:
         graph._add_edge(0, 1, True)
         graph._add_edge(1, 2, True)
         graph._add_edge(1, 3, True)
-        assert sorted(graph._get_callees(1)) == [2, 3]
+        assert sorted(graph._get_callees(1, True)) == [2, 3]
+        assert sorted(graph._get_callees(1, False)) == [2, 3]
 
     def test_callees_ref_ok(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callees(), "call" and "ref" edges."""
@@ -134,7 +135,8 @@ class TestVRCGraph:
         graph._add_edge(0, 1, True)
         graph._add_edge(1, 2, True)
         graph._add_edge(1, 3, False)
-        assert sorted(graph._get_callees(1)) == [2, 3]
+        assert sorted(graph._get_callees(1, False)) == [2]
+        assert sorted(graph._get_callees(1, True)) == [2, 3]
 
     def test_callees_external(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Check callees() for external nodes."""
@@ -146,7 +148,8 @@ class TestVRCGraph:
         graph._add_edge(0, 1, True)
         graph._add_edge(1, 2, True)
         graph._add_edge(1, 3, True)
-        assert sorted(graph._get_callees(1)) == [2, 3]
+        assert sorted(graph._get_callees(1, True)) == [2, 3]
+        assert sorted(graph._get_callees(1, False)) == [2, 3]
 
     def test_labels(self, graph_class: typing.Type[GraphMixin]) -> None:
         graph = graph_class()

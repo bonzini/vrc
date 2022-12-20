@@ -33,6 +33,10 @@ class Node:
         self.callees = set()
         self.refs = set()
 
+    def _all_callees_iter(self) -> typing.Iterable[int]:
+        yield from iter(self.callees)
+        yield from iter(self.refs)
+
     def format(self, include_location: bool) -> str:
         n = self.username or self.name
         if not include_location or self.file is None:
@@ -114,9 +118,11 @@ class Graph:
     def _get_callers(self, i: int) -> typing.Iterable[int]:
         return self.nodes_by_index[i].callers
 
-    def _get_callees(self, i: int) -> typing.Iterable[int]:
-        yield from iter(self.nodes_by_index[i].callees)
-        yield from iter(self.nodes_by_index[i].refs)
+    def _get_callees(self, i: int, ref_ok: bool = True) -> typing.Iterable[int]:
+        if ref_ok:
+            return self.nodes_by_index[i]._all_callees_iter()
+        else:
+            return iter(self.nodes_by_index[i].callees)
 
     def _get_node(self, name: str) -> typing.Union[typing.Tuple[None, None], typing.Tuple[int, str]]:
         i = self.nodes_by_username.get(name, None)

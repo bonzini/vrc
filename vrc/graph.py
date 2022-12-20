@@ -62,7 +62,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def _get_callees(self, i: int) -> typing.Iterable[int]:
+    def _get_callees(self, i: int, ref_ok: bool = True) -> typing.Iterable[int]:
         pass
 
     @abc.abstractmethod
@@ -177,7 +177,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
 
     def _callees(self, i: int, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
         return (self._name_by_index(callee)
-                for callee in self._get_callees(i)
+                for callee in self._get_callees(i, ref_ok)
                 if self._filter_node(callee, external_ok) and self._filter_edge(i, callee, ref_ok))
 
     def callees(self, caller: str, external_ok: bool, ref_ok: bool) -> typing.Iterator[str]:
@@ -275,7 +275,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
         self._filter_edge = self._do_filter_edge
         if n is not None:
             self._check_node_visibility(n)
-            for callee in self._get_callees(n):
+            for callee in self._get_callees(n, True):
                 self._check_node_visibility(callee)
 
     def _keep_node(self, name: str) -> None:
@@ -312,7 +312,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
                 old = path.append(name)
                 if a.is_final(next_state):
                     yield path
-                for callee in self._get_callees(node):
+                for callee in self._get_callees(node, ref_ok):
                     if callee not in visited and self._filter_edge(node, callee, ref_ok):
                         yield from visit(callee, next_state)
                 path.first = old
