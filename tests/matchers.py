@@ -30,6 +30,24 @@ def sample_graph(graph_class: typing.Type[GraphMixin]) -> GraphMixin:
     return g
 
 
+@pytest.fixture
+def complex_graph(graph_class: typing.Type[GraphMixin]) -> GraphMixin:
+    g = graph_class()
+    g.add_node("a")
+    g.add_node("b")
+    g.add_node("c")
+    g.add_node("d")
+    g.add_node("e")
+    g.add_label("a", "CO")
+    g.add_edge("a", "b", "call")
+    g.add_edge("a", "c", "call")
+    g.add_label("c", "CO")
+    g.add_edge("c", "d", "call")
+    g.add_edge("d", "c", "call")
+    g.add_edge("d", "e", "call")
+    return g
+
+
 class TestMatcher:
     def do_test(self, g: GraphMixin, m: Matcher, results: list[str]) -> None:
         assert sorted(list(m.match_nodes_in_graph(g))) == sorted(results)
@@ -77,36 +95,22 @@ class TestMatcher:
     def test_callers(self, sample_graph: GraphMixin) -> None:
         self.do_test(sample_graph, MatchCallers(MatchByName("b")), ["a"])
 
-    def test_callees(self, graph_class: typing.Type[GraphMixin]) -> None:
-        g = graph_class()
-        g.add_node("a")
-        g.add_node("b")
-        g.add_node("c")
-        g.add_node("d")
-        g.add_node("e")
-        g.add_label("a", "CO")
-        g.add_edge("a", "b", "call")
-        g.add_edge("a", "c", "call")
-        g.add_label("c", "CO")
-        g.add_edge("c", "d", "call")
-        g.add_edge("d", "c", "call")
-        g.add_edge("d", "e", "call")
-
+    def test_callees(self, complex_graph: GraphMixin) -> None:
         not_co = MatchNot(MatchLabel("CO"))
-        self.do_test(g, not_co, ["b", "d", "e"])
-        self.do_parse_test(g, "[!CO]", ["b", "d", "e"])
+        self.do_test(complex_graph, not_co, ["b", "d", "e"])
+        self.do_parse_test(complex_graph, "[!CO]", ["b", "d", "e"])
 
         co_callees = MatchCallees(MatchLabel("CO"))
-        self.do_test(g, co_callees, ["b", "c", "d"])
-        self.do_parse_test(g, "[CO:callees]", ["b", "c", "d"])
+        self.do_test(complex_graph, co_callees, ["b", "c", "d"])
+        self.do_parse_test(complex_graph, "[CO:callees]", ["b", "c", "d"])
 
         not_co_callees = MatchCallees(MatchNot(MatchLabel("CO")))
-        self.do_test(g, not_co_callees, ["c", "e"])
-        self.do_parse_test(g, "[!CO:callees]", ["c", "e"])
+        self.do_test(complex_graph, not_co_callees, ["c", "e"])
+        self.do_parse_test(complex_graph, "[!CO:callees]", ["c", "e"])
 
         co_candidate = MatchAnd(not_co, co_callees, MatchNot(not_co_callees))
-        self.do_test(g, co_candidate, ["b", "d"])
-        self.do_parse_test(g, "[!CO,CO:callees,![!CO:callees]]", ["b", "d"])
+        self.do_test(complex_graph, co_candidate, ["b", "d"])
+        self.do_parse_test(complex_graph, "[!CO,CO:callees,![!CO:callees]]", ["b", "d"])
 
     def test_parsers(self, sample_graph: GraphMixin) -> None:
         self.do_parse_test(sample_graph, "a", ["a"])
