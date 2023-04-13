@@ -175,6 +175,38 @@ class MatchLabel(CachingMatcher):
 
 
 @dataclasses.dataclass
+class MatchAllCallees(CachingMatcher):
+    matcher: Matcher
+
+    def __init__(self, matcher: Matcher):
+        self.matcher = matcher
+
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
+        # TODO: what to do about external_ok/ref_ok?
+        nodes: set[str] = set()
+        for n in self.matcher.match_nodes_in_graph(g):
+            nodes.update(g.all_callees(n))
+
+        return iter(nodes)
+
+
+@dataclasses.dataclass
+class MatchAllCallers(CachingMatcher):
+    matcher: Matcher
+
+    def __init__(self, matcher: Matcher):
+        self.matcher = matcher
+
+    def match_nodes_in_graph(self, g: GraphMixin) -> typing.Iterator[str]:
+        # TODO: what to do about ref_ok?
+        nodes: set[str] = set()
+        for n in self.matcher.match_nodes_in_graph(g):
+            nodes.update(g.all_callers(n))
+
+        return iter(nodes)
+
+
+@dataclasses.dataclass
 class MatchCallees(CachingMatcher):
     matcher: Matcher
 
@@ -248,6 +280,8 @@ def _node_matcher_parser() -> Parser:
     Regex = Terminal('/').then(Regex).skip(Terminal('/'))
 
     Operator = \
+        Terminal(':all_callees').value(lambda x: [MatchAllCallees]) | \
+        Terminal(':all_callers').value(lambda x: [MatchAllCallers]) | \
         Terminal(':callees').value(lambda x: [MatchCallees]) | \
         Terminal(':callers').value(lambda x: [MatchCallers])
     Operators = Spaces.then(Operator).repeat(value=[]).value(lambda args: _compose(*args))

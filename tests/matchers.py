@@ -5,7 +5,8 @@ from vrc.automata import Automaton
 from vrc.graph import GraphMixin, PythonGraph
 from vrc.matchers import (
     Matcher, MatchByName, MatchByRegex, MatchLabel, MatchAnd, MatchOr, MatchNot,
-    MatchCallers, MatchCallees, parse_nodespec, parse_pathspec
+    MatchAllCallers, MatchAllCallees, MatchCallers, MatchCallees,
+    parse_nodespec, parse_pathspec
 )
 
 
@@ -94,6 +95,12 @@ class TestMatcher:
 
     def test_callers(self, sample_graph: GraphMixin) -> None:
         self.do_test(sample_graph, MatchCallers(MatchByName("b")), ["a"])
+
+    def test_all_callers(self, complex_graph: GraphMixin) -> None:
+        self.do_test(complex_graph, MatchAllCallers(MatchByName("d")), ["a", "c", "d"])
+
+    def test_all_callees(self, complex_graph: GraphMixin) -> None:
+        self.do_test(complex_graph, MatchAllCallees(MatchByName("d")), ["c", "d", "e"])
 
     def test_callees(self, complex_graph: GraphMixin) -> None:
         not_co = MatchNot(MatchLabel("CO"))
