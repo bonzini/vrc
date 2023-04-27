@@ -1,6 +1,7 @@
 #ifndef MINIRCU_H
 #define MINIRCU_H 1
 
+#include <cstdlib>
 #include <atomic>
 #include <list>
 #include <mutex>
