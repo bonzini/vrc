@@ -1,14 +1,11 @@
 tests = [
   'conftest.py',
+  'cython.py',
   'graph.py',
   'graph_lowlevel.py',
   'matchers.py',
   'nfa.py',
 ]
-
-if py_dep.found()
-  tests += ['cython.py']
-endif
 
 pyfiles = srcfiles
 foreach t: tests

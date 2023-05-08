@@ -4,7 +4,9 @@ project('vrc', [], version: files('VERSION'),
 fs = import('fs')
 py_mod = import('python')
 py = py_mod.find_installation()
-py_dep = py.dependency(required: false)
+py_dep = py.dependency(required: true)
+add_languages('c', 'cpp', 'cython', required: true)
+pure = false
 
 srcfiles = [
   'vrc/__init__.py',
@@ -25,12 +27,7 @@ srcfiles = [
   'vrc/loaders/rtl.py',
 ]
 
-pure = true
-if add_languages('c', 'cython', required: false) and py_dep.found() \
-  and add_languages('cpp', required: false)
-  subdir('vrc')
-  pure = false
-endif
+subdir('vrc')
 
 # use a loop to emulate preserve_path: true (added in 0.64)
 foreach file: srcfiles

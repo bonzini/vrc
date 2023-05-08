@@ -1,8 +1,3 @@
-# C++ is needed to lookup libclang, otherwise LLVM is not found
-if not add_languages('cpp', required: false)
-  subdir_done()
-endif
-
 clang = dependency('Clang', method: 'cmake',
   modules : ['libclang'],
   required: false)
