@@ -1,11 +1,13 @@
 conc = declare_dependency(
-  link_with: static_library('conc', 'minircu.cc'),
+  link_whole: static_library('conc', 'minircu.cc'),
   include_directories: include_directories('.')
 )
 
 cgraph = declare_dependency(
-  link_with: static_library('cgraph', 'cgraph.cc'),
-  dependencies: [conc],
+  link_with: shared_library('cgraph', 'cgraph.cc',
+                            dependencies: [conc],
+                            install: true,
+                            install_dir: py.get_install_dir(pure: false, subdir: 'vrc')),
   include_directories: include_directories('.')
 )
 
