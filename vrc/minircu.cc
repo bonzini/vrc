@@ -35,7 +35,11 @@ void synchronize_rcu()
         return;
     }
 
-    RCUThread::rcu_gp.store(RCUThread::rcu_gp.load(std::memory_order_relaxed) + 1);
+    auto gp = RCUThread::rcu_gp.load(std::memory_order_relaxed);
+
+    // Mark the start of a new grace period, wait for threads that
+    // are "locking" on the old one
+    RCUThread::rcu_gp.store(gp + 1);
 
     // Look at all threads on the first iteration
     std::list<RCUThread *> waiting(threads.begin(), threads.end());
@@ -48,12 +52,12 @@ void synchronize_rcu()
             t->start_gp();
         }
 
-        atomic_thread_fence(std::memory_order_relaxed);
+        atomic_thread_fence(std::memory_order_seq_cst);
 
         // ... then check which threads are still going through the grace period
         std::list<RCUThread *> new_waiting;
         for (auto& t: waiting) {
-            t->check_gp(new_waiting);
+            t->check_gp(gp, new_waiting);
         }
 
         // None?  We're done.

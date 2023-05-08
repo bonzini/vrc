@@ -10,17 +10,17 @@
 
 class RCUThread {
 public:
-    bool need_gp() {
+    bool need_gp(size_t gp) {
 	auto p = _period.load(std::memory_order_relaxed);
-        return p && p == rcu_gp.load(std::memory_order_relaxed);
+        return p && p == gp;
     }
 
     void start_gp() {
         _waiting.store(true, std::memory_order_relaxed);
     }
 
-    void check_gp(std::list<RCUThread *> &list) {
-        if (need_gp()) {
+    void check_gp(size_t gp, std::list<RCUThread *> &list) {
+        if (need_gp(gp)) {
             list.push_back(this);
         } else {
             _waiting.store(false, std::memory_order_relaxed);
