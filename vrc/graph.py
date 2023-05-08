@@ -360,7 +360,7 @@ class GraphMixin(metaclass=abc.ABCMeta):
         self.omitting_callees = set()
         self.keep = None
         self.filter_default = True
-        self._filter_edge = staticmethod(lambda x, y: True)
+        self._filter_edge = lambda x, y: True
 
     def labeled_nodes(self, label: str) -> typing.Iterable[str]:
         return (self._name_by_index(i) for i in self._all_nodes_for_label(label))
