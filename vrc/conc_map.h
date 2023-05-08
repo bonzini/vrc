@@ -121,20 +121,23 @@ template <typename V>
 MapEntry<V> &ConcurrentStringMap<V>::acquire(std::unique_lock<RCUThread> &rcu, const std::string &key)
 {
     contents.reserve(rcu, *this, 0.75);
-    std::size_t i = std::hash<std::string>{}(key) - 1;
-    std::string *this_key;
-    do {
-        i = find_index(key, i);
-        do {
-            this_key = contents[i].key.load(std::memory_order_acquire);
-        } while (this_key == PENDING);
-        if (this_key && *this_key == key) {
+    std::size_t h = std::hash<std::string>{}(key) - 1;
+    for (;;) {
+        std::size_t i = find_index(key, h);
+        MapEntry<V> &e = contents[i];
+        std::string *this_key = e.key.load(std::memory_order_acquire);
+        if (!this_key) {
+            if (e.key.compare_exchange_strong(this_key, PENDING, std::memory_order_acq_rel)) {
+                return e;
+            }
+        } else {
+            if (this_key == PENDING || *this_key != key) {
+                continue;
+            }
             contents.drop_reservation();
-            return contents[i];
+            return e;
         }
-    } while (!contents[i].key.compare_exchange_strong(this_key, PENDING, std::memory_order_acq_rel));
-
-    return contents[i];
+    }
 }
 
 template <typename V>
@@ -156,7 +159,7 @@ ConcurrentStringMap<V>::add(std::unique_lock<RCUThread> &rcu, const std::string 
     MapEntry<V> &e = acquire(rcu, key);
     if (e.key == PENDING) {
         e.value = MapEntry<V>::release_value(std::move(value));
-	// Synchronize with get()
+        // Synchronize with get()
         e.key.store(new std::string(key), std::memory_order_release);
     }
     return e.value;
@@ -170,8 +173,8 @@ ConcurrentStringMap<V>::get(std::unique_lock<RCUThread> &rcu, const std::string 
     i = find_index(key, i);
     MapEntry<V> &e = contents[i];
     // Synchronize with add()
-    std::string *s = e.key.load(std::memory_order_acquire);
-    assert(s && *s == key);
+    std::string *this_key = e.key.load(std::memory_order_acquire);
+    assert(this_key && this_key != PENDING && *this_key == key);
     return e.value;
 }
 
@@ -180,15 +183,21 @@ ConcurrentStringMap<V>::value_type
 ConcurrentStringMap<V>::get(std::unique_lock<RCUThread> &rcu, const std::string &key,
                             ConcurrentStringMap<V>::value_type if_absent)
 {
-    std::size_t i = std::hash<std::string>{}(key) - 1;
-    i = find_index(key, i);
-    MapEntry<V> &e = contents[i];
-    // Synchronize with add()
-    std::string *s = e.key.load(std::memory_order_acquire);
-    if (!s || *s != key) {
-        return if_absent;
+    std::size_t h = std::hash<std::string>{}(key) - 1;
+    for (;;) {
+        std::size_t i = find_index(key, h);
+        MapEntry<V> &e = contents[i];
+        // Synchronize with add()
+        std::string *this_key = e.key.load(std::memory_order_acquire);
+        if (this_key == PENDING) {
+            // could also return if_absent; no big deal
+            continue;
+        }
+        if (!this_key || *this_key != key) {
+            return if_absent;
+        }
+        return e.value;
     }
-    return e.value;
 }
 
 template <typename V>
@@ -236,7 +245,10 @@ size_t ConcurrentStringMap<V>::find_index(const std::string &key, std::size_t i)
 {
     for (;;) {
         i = (i + 1) & (max_size() - 1);
-        std::string *this_key = contents[i].key.load(std::memory_order_acquire);
+        std::string *this_key;
+        do {
+            this_key = contents[i].key.load(std::memory_order_acquire);
+        } while (this_key == PENDING);
         if (!this_key || *this_key == key) {
             return i;
         }
