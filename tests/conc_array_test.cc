@@ -16,29 +16,49 @@ void test_pointer()
     auto rcu = std::unique_lock{t};
     auto i = ca.add(rcu, std::make_unique<std::string> ("abc"));
     assert(i == 0);
+
+    rcu.unlock();
     assert(ca.size() == 1);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 1);
     assert(**ca.begin() == "abc");
     assert(*ca[0] == "abc");
 
     i = ca.add(rcu, std::make_unique<std::string> ("def"));
     assert(i == 1);
+
+    rcu.unlock();
     assert(ca.size() == 2);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 2);
 
     i = ca.add(rcu, std::make_unique<std::string> ("ghi"));
     assert(i == 2);
+
+    rcu.unlock();
     assert(ca.size() == 3);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 3);
 
     i = ca.add(rcu, std::make_unique<std::string> ("jkl"));
     assert(i == 3);
+
+    rcu.unlock();
     assert(ca.size() == 4);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 4);
 
     i = ca.add(rcu, std::make_unique<std::string> ("mno"));
     assert(i == 4);
+
+    rcu.unlock();
     assert(ca.size() == 5);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 5);
     assert(**ca.begin() == "abc");
     assert(ca.max_size() > 4);
@@ -62,29 +82,49 @@ void test_no_pointer()
     auto rcu = std::unique_lock{t};
     auto i = ca.add(rcu, std::string("abc"));
     assert(i == 0);
+
+    rcu.unlock();
     assert(ca.size() == 1);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 1);
     assert(*ca.begin() == "abc");
     assert(ca[0] == "abc");
 
     i = ca.add(rcu, std::string("def"));
     assert(i == 1);
+
+    rcu.unlock();
     assert(ca.size() == 2);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 2);
 
     i = ca.add(rcu, std::string("ghi"));
     assert(i == 2);
+
+    rcu.unlock();
     assert(ca.size() == 3);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 3);
 
     i = ca.add(rcu, std::string("jkl"));
     assert(i == 3);
+
+    rcu.unlock();
     assert(ca.size() == 4);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 4);
 
     i = ca.add(rcu, std::string("mno"));
     assert(i == 4);
+
+    rcu.unlock();
     assert(ca.size() == 5);
+    rcu.lock();
+
     assert(ca.end() - ca.begin() == 5);
     assert(*ca.begin() == "abc");
     assert(ca.max_size() > 4);
