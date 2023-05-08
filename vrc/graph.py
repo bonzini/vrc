@@ -290,7 +290,10 @@ class GraphMixin(metaclass=abc.ABCMeta):
         self._keep_node(name)
 
     def paths(self, a: Automaton[typing.Any], external_ok: bool,
-              ref_ok: bool) -> typing.Iterable[typing.Iterable[str]]:
+              ref_ok: bool, limit: typing.Optional[int] = None) -> typing.Iterable[typing.Iterable[str]]:
+        if limit is not None and limit <= 0:
+            return
+
         visited: set[int] = set()
         callees: dict[int, list[int]] = dict()
         path = Path()
@@ -334,6 +337,10 @@ class GraphMixin(metaclass=abc.ABCMeta):
                 if a.is_final(next_state):
                     path.append(name, node, gen, state)
                     yield path
+                    if limit is not None:
+                        limit -= 1
+                        if limit == 0:
+                            return
                     if not down:
                         path.first = path.first.next       # type: ignore
                         continue

@@ -403,8 +403,9 @@ class TestPath:
 
     @staticmethod
     def get_all_paths(graph: GraphMixin, ast: regex.RegexAST,
-                      external_ok: bool = True, ref_ok: bool = True) -> list[list[str]]:
-        return [list(path) for path in graph.paths(ast.nfa().lazy_dfa(), external_ok, ref_ok)]
+                      external_ok: bool = True, ref_ok: bool = True,
+                      limit: typing.Optional[int] = None) -> list[list[str]]:
+        return [list(path) for path in graph.paths(ast.nfa().lazy_dfa(), external_ok, ref_ok, limit)]
 
     def test_sample_graph(self, graph_class: typing.Type[GraphMixin]) -> None:
         graph = self.graph_for_paths(graph_class)
@@ -443,6 +444,21 @@ class TestPath:
         assert len(result) == 2
         assert result[0] == ["d", "a"]
         assert result[1] == ["d", "c", "b", "a"]
+
+    def test_path_limit(self, graph_class: typing.Type[GraphMixin]) -> None:
+        """Test interrupting a path search."""
+        graph = self.graph_for_paths(graph_class)
+        ast = regex.Sequence(
+            regex.One("a".__eq__),
+            regex.Star(regex.One(lambda x: True)),
+            regex.One("d".__eq__)
+        )
+        result = self.get_all_paths(graph, ast, limit=1)
+        result = sorted(result, key=lambda x: len(x))
+        if len(result[0]) == 2:
+            assert result[0] == ["d", "a"]
+        else:
+            assert result[0] == ["d", "c", "b", "a"]
 
     def test_label(self, graph_class: typing.Type[GraphMixin]) -> None:
         """Test a simple path with one-node path with labels."""

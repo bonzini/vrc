@@ -628,13 +628,9 @@ class PathsCommand(VRCCommand):
     def run(self, args: argparse.Namespace) -> None:
         result = parse_pathspec(GRAPH, " ".join(args.expr))
         dfa = result.nfa().lazy_dfa()
-        n = 0
         try:
-            for path in GRAPH.paths(dfa, args.include_external, args.include_ref):
+            for path in GRAPH.paths(dfa, args.include_external, args.include_ref, args.limit):
                 print(" <- ".join(path))
-                n += 1
-                if n == args.limit:
-                    break
         except KeyboardInterrupt:
             print("Interrupt", file=sys.stderr)
             return
